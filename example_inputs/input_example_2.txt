@@ -1,0 +1,17 @@
+# 1. S - projected columns / expressions
+cust, count_1_quant, sum_2_quant, max_3_quant
+
+# 2. n - number of grouping variables
+3
+
+# 3. V - grouping attributes
+cust
+
+# 4. F-VECT – vector of aggregate functions
+count_1_quant, sum_2_quant, max_3_quant
+
+# 5. PRED-LIST – list of predicates for grouping var’s
+1.state = ‘NY’, 2.state = ‘NJ’, 3.state = ‘CT’
+
+# 6. HAVING
+NONE

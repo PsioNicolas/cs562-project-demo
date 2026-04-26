@@ -1,6 +1,13 @@
+"""
+Name: Nicolas Banatt
+CWID: 20014265
+"""
+
 import subprocess
 import sys
 
+from input_handler import InputHandler
+from phi import Phi
 
 def main():
     """
@@ -8,6 +15,10 @@ def main():
     needed to run the query. That generated code should be saved to a 
     file (e.g. _generated.py) and then run.
     """
+
+    phi: Phi = InputHandler().get_phi_expr()
+
+    exit()
 
     body = """
     for row in cur:
