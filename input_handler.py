@@ -20,9 +20,9 @@ class InputHandler:
         try:
             # Read from file if one is provided, else read each operand from keyboard
             if file_name:
-                self.__read_phi_from_file(file_name)
+                phi = self.__read_phi_from_file(file_name)
             else:
-                self.__read_phi_from_manual_input()
+                phi = self.__read_phi_from_manual_input()
         except Exception as e:
             print(f"Error: {e}")
             exit()

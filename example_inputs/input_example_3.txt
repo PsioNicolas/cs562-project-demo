@@ -1,0 +1,17 @@
+# SELECT ATTRIBUTE(S):
+cust, prod, avg_quant, max_quant
+
+# NUMBER OF GROUPING VARIABLES(n):
+0
+
+# GROUPING ATTRIBUTES(V):
+cust, prod
+
+# F-VECT([F]):
+avg_quant, max_quant
+
+# SELECT CONDITION-VECT([σ]):
+NONE
+
+# HAVING_CONDITION(G):
+NONE

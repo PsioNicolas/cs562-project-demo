@@ -10,7 +10,7 @@ class Phi:
 
     def __init__(self, S, n, V, F, o, G):
         """
-        Creates an instance of a Phi operator
+        Creates an instance of a Phi expression
         """
         self.S = S
         self.n = n

@@ -18,7 +18,13 @@ def query():
     conn = psycopg2.connect("dbname="+dbname+" user="+user+" password="+password,
                             cursor_factory=psycopg2.extras.DictCursor)
     cur = conn.cursor()
-    cur.execute("SELECT * FROM sales WHERE quant > 10")
+    # cur.execute("SELECT * FROM sales WHERE quant > 10")
+    cur.execute("""
+select cust, prod, avg(quant), max(quant)
+from sales
+where year=2009
+group by cust, prod
+""")
 
     return tabulate.tabulate(cur.fetchall(),
                              headers="keys", tablefmt="psql")
