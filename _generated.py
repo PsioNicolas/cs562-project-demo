@@ -10,11 +10,9 @@ from dataclasses import dataclass
 @dataclass(slots=True)
 class MfStruct:
 	cust: str
-	sum_1_quant: int
-	avg_1_quant: int
-	sum_2_quant: int
-	sum_3_quant: int
-	avg_3_quant: int
+	prod: str
+	avg_quant: int
+	max_quant: int
 
 mf_struct = []
 
@@ -22,19 +20,22 @@ mf_struct = []
 def lookup(cur_row):
     '''Search for a given "group by" attribute value(s) in mf_struct'''
     for i in range(len(mf_struct)):
-        if mf_struct[i].cust == cur_row.cust:
+        if mf_struct[i].cust == cur_row['cust'] and mf_struct[i].prod == cur_row['prod']:
             return i
     return -1
 
 def add(cur_row):
     '''Adds a new entry in mf_struct corresponding to a newly found group by attribute value'''
-    mf_struct.append(MfStruct(cust=cur_row.cust, sum_1_quant=0, avg_1_quant=0, sum_2_quant=0, sum_3_quant=0, avg_3_quant=0))
+    mf_struct.append(MfStruct(cust=cur_row['cust'], prod=cur_row['prod'], avg_quant=0, max_quant=-1))
 
 def output():
-    '''Prints mf_struct to stdout'''
-    print("cust   sum_1_quant   avg_1_quant   sum_2_quant   sum_3_quant   avg_3_quant")
-    for entry in mf_struct:
-        print(f"{entry.cust}   {entry.sum_1_quant}   {entry.avg_1_quant}   {entry.sum_2_quant}   {entry.sum_3_quant}   {entry.avg_3_quant}")
+    '''Prints only the select attributes of mf_struct to stdout'''
+    # print("cust   prod   avg_quant   max_quant")
+    # for entry in mf_struct:
+    #     print(f"{entry.cust}   {entry.prod}   {entry.avg_quant}   {entry.max_quant}")
+
+    mf_struct_table = [(entry.cust, entry.prod, entry.avg_quant, entry.max_quant) for entry in mf_struct]
+    print(tabulate.tabulate(mf_struct_table, headers=['cust', 'prod', 'avg_quant', 'max_quant'], tablefmt="psql"))
 
 
 def query():
@@ -49,18 +50,26 @@ def query():
     cur = conn.cursor()
     cur.execute("SELECT * FROM sales")
     
-    _global = []
+    table = []
     
     for row in cur:
-        if row['quant'] > 10:
-            _global.append(row)
+        table.append(row)
+    
+    # Table scan 1: Populate mf_struct with distinct values of grouping attributes
+    for row in table:
+        pos = lookup(row)
+        if pos == -1:
+            add(row)
     
     
-    return tabulate.tabulate(_global,
+    
+    return tabulate.tabulate(table,
                         headers="keys", tablefmt="psql")
 
 def main():
-    print(query())
+    #print(query())
+    query()
+    output()
     
 if "__main__" == __name__:
     main()

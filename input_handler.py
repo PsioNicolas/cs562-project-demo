@@ -1,6 +1,7 @@
 """
-Name: Nicolas Banatt
-CWID: 20014265
+Team members: Nicolas Banatt CWID(20014265), Aidan Cancelliere CWID()
+
+Handles the input to get the phi operands.
 """
 
 from phi import Phi
@@ -29,7 +30,10 @@ class InputHandler:
 
         return phi
     
-    def __read_phi_from_file(self, file_name) -> Phi:
+    def __read_phi_from_file(self, file_name: str) -> Phi:
+        """
+        Gets phi operands from a file
+        """
         # Starting state to read first input
         state = 0
 
@@ -64,6 +68,9 @@ class InputHandler:
         return Phi(*operands)
 
     def __read_phi_from_manual_input(self) -> Phi:
+        """
+        Gets phi operands from manual user keyboard input
+        """
         print("Use comma separated lists.")
         S = self.__read_select_attrs(input("Select attributes (S): "))
         n = self.__read_num_group_vars(input("Number of grouping variables (n): "))
@@ -73,23 +80,29 @@ class InputHandler:
         G = self.__read_having(input("Having condition: "))
         return Phi(S, n, V, F, o, G)
     
-    def __read_select_attrs(self, S):
+    def __read_select_attrs(self, S: str):
+        '''Reads a string S of select attributes separated by commas'''
         return self.__parse_comma_separated_list(S)
 
-    def __read_num_group_vars(self, n):
+    def __read_num_group_vars(self, n: str):
         return int(n)
 
-    def __read_group_attrs(self, V):
+    def __read_group_attrs(self, V: str):
+        '''Reads a string V of group by attributes separated by commas'''
         return self.__parse_comma_separated_list(V)
 
-    def __read_aggregates(self, F):
+    def __read_aggregates(self, F: str):
+        '''Reads a string F of aggregates separated by commas'''
         return self.__parse_comma_separated_list(F)
 
-    def __read_group_var_preds(self, o):
+    def __read_group_var_preds(self, o: str):
+        '''Reads a string o of group variable predicates separated by commas'''
         return self.__parse_comma_separated_list(o)
     
-    def __read_having(self, G):
+    def __read_having(self, G: str):
+        '''Reads a string G of a having clause predicate'''
         return G.strip()
 
-    def __parse_comma_separated_list(self, l):
+    def __parse_comma_separated_list(self, l: str):
+        '''Returns a list from a string l of comma separated items'''
         return [attr.strip() for attr in l.split(',')]

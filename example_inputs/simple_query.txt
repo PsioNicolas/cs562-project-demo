@@ -11,7 +11,7 @@ cust, prod
 avg_quant, max_quant
 
 # SELECT CONDITION-VECT([σ]):
-NONE
+year=2020
 
 # HAVING_CONDITION(G):
 NONE

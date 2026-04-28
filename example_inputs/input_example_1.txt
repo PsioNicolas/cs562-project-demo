@@ -14,4 +14,4 @@ sum_1_quant, avg_1_quant, sum_2_quant, sum_3_quant, avg_3_quant
 1.state='NY', 2.state='NJ', 3.state='CT'
 
 # HAVING_CONDITION(G):
-1_sum_quant > 2 * sum_2_quant or avg_1_quant > avg_3_quant
+sum_1_quant > 2 * sum_2_quant or avg_1_quant > avg_3_quant

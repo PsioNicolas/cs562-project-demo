@@ -1,6 +1,8 @@
 """
-Name: Nicolas Banatt
-CWID: 20014265
+Team members: Nicolas Banatt CWID(20014265), Aidan Cancelliere CWID()
+
+Generates a _generated.py file that outputs the result of a user's EMF query,
+either from a file or from manual keyboard input.
 """
 
 import subprocess
@@ -19,6 +21,14 @@ sales_schema = {
     "quant": "int",
     "date": "str"
 }
+
+# def generate_code_from_pred(pred: str) -> str:
+#     """
+#     Generates python code snippet from a grouping variable predicate input by the user.
+
+#     Ex. input: "1.product=product and 1.quant > avg_quant" -> 
+#         output: "row['product'] == mf_struct[pos].product and row['quant'] > mf_struct[pos].avg_quant"
+#     """
 
 def main():
     """
@@ -50,28 +60,46 @@ mf_struct = []
 def lookup(cur_row):
     '''Search for a given "group by" attribute value(s) in mf_struct'''
     for i in range(len(mf_struct)):
-        if {" and ".join([f"mf_struct[i].{attr} == cur_row.{attr}" for attr in phi.V])}:
+        if {" and ".join([f"mf_struct[i].{attr} == cur_row['{attr}']" for attr in phi.V])}:
             return i
     return -1
 
 def add(cur_row):
     '''Adds a new entry in mf_struct corresponding to a newly found group by attribute value'''
     mf_struct.append(MfStruct({", ".join(
-        [f"{attr}=cur_row.{attr}" for attr in phi.V] +
+        [f"{attr}=cur_row['{attr}']" for attr in phi.V] +
         [f"{aggr}={-1 if 'max' in aggr else 0}" for aggr in phi.F]
     )}))
 
 def output():
-    '''Prints mf_struct to stdout'''
-    print("{'   '.join([field for field in phi.V + phi.F])}")
-    for entry in mf_struct:
-        print(f"{'   '.join([f'{{entry.{field}}}' for field in phi.V + phi.F])}")
-"""
+    '''Prints only the select attributes of mf_struct to stdout'''
+    # print("{'   '.join([field for field in phi.S])}")
+    # for entry in mf_struct:
+    #     print(f"{'   '.join([f'{{entry.{field}}}' for field in phi.S])}")
 
-    body = """
+    mf_struct_table = [({', '.join([f"entry.{attr}" for attr in phi.S])}) for entry in mf_struct]
+    print(tabulate.tabulate(mf_struct_table, headers={phi.S}, tablefmt="psql"))
+"""
+    
+    # Code for first table scan to populate mf_struct
+    populate_mf_struct = """
+    # Table scan 1: Populate mf_struct with distinct values of grouping attributes
+    for row in table:
+        pos = lookup(row)
+        if pos == -1:
+            add(row)
+    """
+
+    # compute_aggregates = [f"""
+    # for row in table:
+    #     pos = lookup(row)
+    #     if {generate_code_from_pred(phi.o[i])}:
+    # """ for i in range(phi.n)]
+
+    body = f"""
     for row in cur:
-        if row['quant'] > 10:
-            _global.append(row)
+        table.append(row)
+    {populate_mf_struct}
     """
 
     # Note: The f allows formatting with variables.
@@ -99,14 +127,16 @@ def query():
     cur = conn.cursor()
     cur.execute("SELECT * FROM sales")
     
-    _global = []
+    table = []
     {body}
     
-    return tabulate.tabulate(_global,
+    return tabulate.tabulate(table,
                         headers="keys", tablefmt="psql")
 
 def main():
-    print(query())
+    #print(query())
+    query()
+    output()
     
 if "__main__" == __name__:
     main()
