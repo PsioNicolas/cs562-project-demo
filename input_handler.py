@@ -2,6 +2,42 @@
 Team members: Nicolas Banatt CWID(20014265), Aidan Cancelliere CWID()
 
 Handles the input to get the phi operands.
+
+The operands should be structured as follows:
+
+# SELECT ATTRIBUTE(S):
+#   Regular attributes should be their name in the schema (Ex. cust)
+#   Aggregates should be structured like <agg>_[<gv>_]<attr>
+#       agg: Name of the aggregate (Ex. sum, count, max)
+#       gv: Grouping variable associated with the aggregate (Ex. 1, 2, 3...)
+#           For normal aggregates / grouping variable 0, leave out the number (Ex. avg_quant)
+#       attr: Name of the attribute (Ex. quant)
+#   Each attribute should be separated by a comma.
+cust, sum_1_quant, sum_2_quant, sum_3_quant
+
+# NUMBER OF GROUPING VARIABLES(n):
+#   Integer from [0, inf)
+3
+
+# GROUPING ATTRIBUTES(V):
+#   Names of attributes from the table separated by commas
+cust
+
+# F-VECT([F]):
+#   List of aggregates associated with each grouping variable / group.
+#   Refer to SELECT ATTRIBUTE(S) to know how to format each one.
+avg_quant, max_1_quant
+
+# SELECT CONDITION-VECT([σ]):
+#   Ordered list of predicates associated with each grouping variable.
+#   When accessing a row value, 
+1.quant > avg_quant, 2.quant < max_1_quant, 3.state='CT'
+
+# HAVING_CONDITION(G):
+
+sum_1_quant > 2 * sum_2_quant or avg_1_quant > avg_3_quant
+
+For V, F, σ, or G, you can type NONE if they are not part of the expression.
 """
 
 from phi import Phi

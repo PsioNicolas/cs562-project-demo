@@ -22,13 +22,22 @@ sales_schema = {
     "date": "str"
 }
 
-# def generate_code_from_pred(pred: str) -> str:
-#     """
-#     Generates python code snippet from a grouping variable predicate input by the user.
+def generate_code_from_pred_operand(i: int, op: str) -> str:
+    """
+    Generates python code snippet from a single predicate operand.
 
-#     Ex. input: "1.product=product and 1.quant > avg_quant" -> 
-#         output: "row['product'] == mf_struct[pos].product and row['quant'] > mf_struct[pos].avg_quant"
-#     """
+    Ex. "1.state" -> "row['state']"
+        "avg_2_quant -> 
+    """
+
+def generate_code_from_pred(i: int, phi: Phi) -> str:
+    """
+    Generates python code snippet from a grouping variable predicate input by the user.
+
+    Ex. input: "1.product=product and 1.quant > avg_quant" -> 
+        output: "row['product'] == mf_struct[pos].product and row['quant'] > mf_struct[pos].avg_quant"
+    """
+
 
 def main():
     """
@@ -58,11 +67,13 @@ mf_struct = []
     # Database helper functions
     helpers = f"""
 def lookup(cur_row):
-    '''Search for a given "group by" attribute value(s) in mf_struct'''
+    '''Search for '''
+    indices = []
     for i in range(len(mf_struct)):
-        if {" and ".join([f"mf_struct[i].{attr} == cur_row['{attr}']" for attr in phi.V])}:
-            return i
-    return -1
+        # if {" and ".join([f"mf_struct[i].{attr} == cur_row['{attr}']" for attr in phi.V])}:
+        if {group_var_pred()}
+            indices.append(i)
+    return indices
 
 def add(cur_row):
     '''Adds a new entry in mf_struct corresponding to a newly found group by attribute value'''
@@ -81,25 +92,28 @@ def output():
     print(tabulate.tabulate(mf_struct_table, headers={phi.S}, tablefmt="psql"))
 """
     
-    # Code for first table scan to populate mf_struct
-    populate_mf_struct = """
-    # Table scan 1: Populate mf_struct with distinct values of grouping attributes
-    for row in table:
-        pos = lookup(row)
-        if pos == -1:
-            add(row)
-    """
-
-    # compute_aggregates = [f"""
+    # # Code for first table scan to populate mf_struct
+    # populate_mf_struct = """
+    # # Table scan 1: Populate mf_struct with distinct values of grouping attributes
     # for row in table:
     #     pos = lookup(row)
-    #     if {generate_code_from_pred(phi.o[i])}:
-    # """ for i in range(phi.n)]
+    #     if not pos:
+    #         add(row)
+    # """
+
+    emf_algorithm = ''.join([f"""
+    # Table scan {i+1} for grouping variable {i}
+    for row in table:
+        for entry in mf_struct:
+            if {generate_code_from_pred(i, phi)}:
+                {generate_code_update_aggrs(i, phi)}
+                
+    """ for i in range(phi.n + 1)])
 
     body = f"""
     for row in cur:
         table.append(row)
-    {populate_mf_struct}
+    {emf_algorithm}
     """
 
     # Note: The f allows formatting with variables.
