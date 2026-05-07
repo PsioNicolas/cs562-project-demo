@@ -14,7 +14,7 @@ Ex. avg_1_quant -> sum_1_quant, count_1_quant
 import subprocess
 import sys
 
-from input_handler import InputHandler
+import input_handler as InputHandler
 from phi import Phi
 
 DEBUG = True
@@ -94,6 +94,7 @@ def generate_mf_struct_def(phi: Phi) -> str:
 @dataclass(slots=True)
 class MfStruct:
 {indent(struct_fields)}
+
 mf_struct = []
     """
 
@@ -116,22 +117,21 @@ def generate_aggr_update_statement(aggr: str, phi: Phi, mf_index_name: str, row_
         case "count":
             return f"{mf_val} += 1"
         case "max":
-            # TODO: Refactor this to not check this at the statement level
             return f"if {mf_val} < {row_val}: {mf_val} = {row_val}"
         case _:
             assert False, f"Invalid aggregate type: {aggr_type}"
 
 def generate_code_to_update_aggrs(i: int, phi: Phi, mf_index_name: str, row_name: str) -> str:
     """
-    Generates list of python statements to update each aggregate corresponding to grouping variable i
+    Generates python code to update each aggregate corresponding to grouping variable i
     """
-    updates_statements = []
+    code = ""
 
     aggrs = phi.get_group_var_aggrs(i)
     for aggr in aggrs:
-        updates_statements.append(generate_aggr_update_statement(aggr, phi, mf_index_name, row_name))
+        code += (generate_aggr_update_statement(aggr, phi, mf_index_name, row_name)) + '\n'
 
-    return updates_statements
+    return code
 
 def generate_helpers(phi: Phi) -> str:
     """
@@ -154,8 +154,30 @@ def add(cur_row):
 
 def output():
     '''Prints only the select attributes of mf_struct to stdout'''
-    mf_struct_table = [({', '.join([f"entry.{attr}" for attr in phi.S])}) for entry in mf_struct]
+    mf_struct_table = [({', '.join([mf_entry_proj("entry", attr) for attr in phi.S])}) for entry in mf_struct]
     print(tabulate.tabulate(mf_struct_table, headers={phi.S}, tablefmt="psql"))
+    """
+
+def generate_emf_table_scan(i: int, mf_index_name: str, row_name: str, pred_code: str, update_aggr_code: str) -> str:
+    """
+    Generates python code to perform one scan of the table to compute aggregates for grouping variable i
+    """
+    return f"""
+# Table scan {i+1} for grouping variable {i}
+for {row_name} in table:
+    for {mf_index_name} in range(len(mf_struct)):
+        if {pred_code}:
+{indent(update_aggr_code, 3)}
+    """
+
+def generate_calculate_avgs(i: int, mf_index_name: str) -> str:
+    """
+    Generates python code to update averages in a single row corresponding to grouping variable i
+    """
+    return f"""
+# Compute averages for grouping variable {i} at end of scan
+for {mf_index_name} in range(len(mf_struct)):
+
     """
 
 def generate_body(phi: Phi) -> str:
@@ -173,39 +195,48 @@ for row in table:
 
     mf_index_name = "i"
     row_name = "cur_row"
+    group_vars = range(phi.n + 1)
 
     # List of python code condition snippets for each grouping variable (including grouping variable 0)
     group_var_preds_code = [
         generate_code_from_pred(i, phi, mf_index_name, row_name) 
-        for i in range(phi.n + 1)
+        for i in group_vars
     ]
     # List of python code snippets to update aggregates corresponding to each grouping variable
     group_var_update_aggrs_code = [
         generate_code_to_update_aggrs(i, phi, mf_index_name, row_name) 
-        for i in range(phi.n + 1)
+        for i in group_vars
     ]
 
-    emf_algorithm = ''.join([f"""
-# Table scan {i+1} for grouping variable {i}
-for {row_name} in table:
-    for {mf_index_name} in range(len(mf_struct)):
-        if {group_var_preds_code[i]}:
-            {group_var_update_aggrs_code[i]}
+    emf_algorithm = []
+    for i in group_vars:
+        # At the end of a table scan, compute all necessary averages for this grouping variable
+        table_scan = generate_emf_table_scan(
+            i, mf_index_name, row_name, group_var_preds_code[i], group_var_update_aggrs_code[i]
+        )
+        compute_avgs = generate_calculate_avgs(i, mf_index_name) if phi.gv_computes_avg(i) else ""
 
-# Compute average at end of scan
-    """ for i in range(phi.n + 1)])
+        # Scan over table to update aggregates for this grouping variable
+        emf_algorithm.append(f"""
+{table_scan}
+{compute_avgs}
+        """)
+    # Join all scans
+    emf_algorithm = '\n'.join(emf_algorithm)
 
     return f"""
 for row in cur:
     table.append(row)
 {populate_mf_struct}
+{emf_algorithm}
     """
 
 def generate_program(mf_struct: str, helpers: str, body: str) -> str:
     """
     Generates final program code. Inserts important sections into bare minimum skeleton.
     """
-    return f"""import os
+    return f"""
+import os
 import psycopg2
 import psycopg2.extras
 import tabulate
@@ -229,6 +260,9 @@ def query():
     cur.execute("SELECT * FROM sales")
     
     table = []
+    for row in cur:
+        table.append(row)
+
 {indent(body)}
     
     return tabulate.tabulate(table,

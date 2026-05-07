@@ -51,6 +51,17 @@ class Phi:
                 aggrs.append(aggr)
         return aggrs
     
+    def gv_computes_avg(self, i: int) -> bool:
+        """
+        Returns True if grouping variable i has an 'avg' aggregate associated with it
+        Ex. i = 0, F = [..., 'avg_quant', ...] -> True
+            i = 1, F = [..., 'avg_1_quant', ...] -> True
+        """
+        return any(
+            Phi.get_aggr_type(aggr) == 'avg' and Phi.__get_aggr_num(aggr) == i
+            for aggr in self.F
+        )
+    
     @staticmethod
     def get_aggr_type(aggr: str) -> str:
         """

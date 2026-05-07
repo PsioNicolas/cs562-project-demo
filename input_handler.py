@@ -44,113 +44,98 @@ For V, F, σ, or G, you can type NONE if they are not part of the expression.
 
 from phi import Phi
 
-class InputHandler:
+def get_phi_expr() -> Phi:
     """
-    Handles user input
+    Gets phi operands from a file or from manual input
     """
-
-    @staticmethod
-    def get_phi_expr() -> Phi:
-        """
-        Gets phi operands from a file or from manual input
-        """
-        file_name = input("Enter a file path to a phi expression or press enter to input each operand manually: ").strip()
-        
-        phi: Phi = None
-        try:
-            # Read from file if one is provided, else read each operand from keyboard
-            if file_name:
-                phi = InputHandler.__read_phi_from_file(file_name)
-            else:
-                phi = InputHandler.__read_phi_from_manual_input()
-        except Exception as e:
-            print(f"Error: {e}")
-            exit()
-
-        return phi
+    file_name = input("Enter a file path to a phi expression or press enter to input each operand manually: ").strip()
     
-    @staticmethod
-    def __read_phi_from_file(file_name: str) -> Phi:
-        """
-        Gets phi operands from a file
-        """
-        # Starting state to read first input
-        state = 0
+    phi: Phi = None
+    try:
+        # Read from file if one is provided, else read each operand from keyboard
+        if file_name:
+            phi = _read_phi_from_file(file_name)
+        else:
+            phi = _read_phi_from_manual_input()
+    except Exception as e:
+        print(f"Error: {e}")
+        exit()
 
-        # Functions that correspond with reading each operand 
-        # state is the index into this list
-        read_operand = [
-            InputHandler.__read_select_attrs,
-            InputHandler.__read_num_group_vars,
-            InputHandler.__read_group_attrs,
-            InputHandler.__read_aggregates,
-            InputHandler.__read_group_var_preds,
-            InputHandler.__read_having
-        ]
+    return phi
 
-        operands = []
-        with open(file_name) as f:
-            for line in f:
-                # Remove leading and trailing whitespace
-                line = line.strip()
+def _read_phi_from_file(file_name: str) -> Phi:
+    """
+    Gets phi operands from a file
+    """
+    # Starting state to read first input
+    state = 0
 
-                # Comments start with '#'
-                if line == "" or line[0] == '#':
-                    continue
+    # Functions that correspond with reading each operand 
+    # state is the index into this list
+    read_operand = [
+        _read_select_attrs,
+        _read_num_group_vars,
+        _read_group_attrs,
+        _read_aggregates,
+        _read_group_var_preds,
+        _read_having
+    ]
 
-                # Read next operand
-                operands.append(read_operand[state](line))
+    operands = []
+    with open(file_name) as f:
+        for line in f:
+            # Remove leading and trailing whitespace
+            line = line.strip()
 
-                # Enter new state to process next input
-                state += 1
-        
-        # Unpack list to initialize Phi class
-        return Phi(*operands)
+            # Comments start with '#'
+            if line == "" or line[0] == '#':
+                continue
 
-    @staticmethod
-    def __read_phi_from_manual_input() -> Phi:
-        """
-        Gets phi operands from manual user keyboard input
-        """
-        print("Use comma separated lists.")
-        S = InputHandler.__read_select_attrs(input("Select attributes (S): "))
-        n = InputHandler.__read_num_group_vars(input("Number of grouping variables (n): "))
-        V = InputHandler.__read_group_attrs(input("Grouping attributes (V): "))
-        F = InputHandler.__read_aggregates(input("Vector of aggregates (F): "))
-        sigma = InputHandler.__read_group_var_preds(input("Grouping variable predicates: (σ): "))
-        G = InputHandler.__read_having(input("Having condition: "))
-        return Phi(S, n, V, F, sigma, G)
+            # Read next operand
+            operands.append(read_operand[state](line))
+
+            # Enter new state to process next input
+            state += 1
     
-    @staticmethod
-    def __read_select_attrs(S: str):
-        '''Reads a string S of select attributes separated by commas'''
-        return InputHandler.__parse_comma_separated_list(S)
+    # Unpack list to initialize Phi class
+    return Phi(*operands)
 
-    @staticmethod
-    def __read_num_group_vars(n: str):
-        return int(n)
+def _read_phi_from_manual_input() -> Phi:
+    """
+    Gets phi operands from manual user keyboard input
+    """
+    print("Use comma separated lists.")
+    S = _read_select_attrs(input("Select attributes (S): "))
+    n = _read_num_group_vars(input("Number of grouping variables (n): "))
+    V = _read_group_attrs(input("Grouping attributes (V): "))
+    F = _read_aggregates(input("Vector of aggregates (F): "))
+    sigma = _read_group_var_preds(input("Grouping variable predicates: (σ): "))
+    G = _read_having(input("Having condition: "))
+    return Phi(S, n, V, F, sigma, G)
 
-    @staticmethod
-    def __read_group_attrs(V: str):
-        '''Reads a string V of group by attributes separated by commas'''
-        return InputHandler.__parse_comma_separated_list(V)
+def _read_select_attrs(S: str):
+    '''Reads a string S of select attributes separated by commas'''
+    return _parse_comma_separated_list(S)
 
-    @staticmethod
-    def __read_aggregates(F: str):
-        '''Reads a string F of aggregates separated by commas'''
-        return InputHandler.__parse_comma_separated_list(F)
+def _read_num_group_vars(n: str):
+    return int(n)
 
-    @staticmethod
-    def __read_group_var_preds(sigma: str):
-        '''Reads a string sigma of group variable predicates separated by commas'''
-        return InputHandler.__parse_comma_separated_list(sigma)
-    
-    @staticmethod
-    def __read_having(G: str):
-        '''Reads a string G of a having clause predicate'''
-        return G.strip()
+def _read_group_attrs(V: str):
+    '''Reads a string V of group by attributes separated by commas'''
+    return _parse_comma_separated_list(V)
 
-    @staticmethod
-    def __parse_comma_separated_list(l: str):
-        '''Returns a list from a string l of comma separated items'''
-        return [attr.strip() for attr in l.split(',')]
+def _read_aggregates(F: str):
+    '''Reads a string F of aggregates separated by commas'''
+    return _parse_comma_separated_list(F)
+
+def _read_group_var_preds(sigma: str):
+    '''Reads a string sigma of group variable predicates separated by commas'''
+    return _parse_comma_separated_list(sigma)
+
+def _read_having(G: str):
+    '''Reads a string G of a having clause predicate'''
+    return G.strip()
+
+def _parse_comma_separated_list(l: str):
+    '''Returns a list from a string l of comma separated items'''
+    return [attr.strip() for attr in l.split(',')]
