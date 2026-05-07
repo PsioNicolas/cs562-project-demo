@@ -15,14 +15,19 @@ class MfStruct:
 	max_quant: int
 
 mf_struct = []
-
+    
 
 def lookup(cur_row):
-    '''Search for a given "group by" attribute value(s) in mf_struct'''
+    '''Search for all indices in the mf_struct that match the current group'''
+    # indices = []
+    pos = -1
     for i in range(len(mf_struct)):
         if mf_struct[i].cust == cur_row['cust'] and mf_struct[i].prod == cur_row['prod']:
             return i
-    return -1
+        # if
+        #     indices.append(i)
+    # return indices
+    return pos
 
 def add(cur_row):
     '''Adds a new entry in mf_struct corresponding to a newly found group by attribute value'''
@@ -30,13 +35,9 @@ def add(cur_row):
 
 def output():
     '''Prints only the select attributes of mf_struct to stdout'''
-    # print("cust   prod   avg_quant   max_quant")
-    # for entry in mf_struct:
-    #     print(f"{entry.cust}   {entry.prod}   {entry.avg_quant}   {entry.max_quant}")
-
     mf_struct_table = [(entry.cust, entry.prod, entry.avg_quant, entry.max_quant) for entry in mf_struct]
     print(tabulate.tabulate(mf_struct_table, headers=['cust', 'prod', 'avg_quant', 'max_quant'], tablefmt="psql"))
-
+    
 
 def query():
     load_dotenv()
@@ -58,6 +59,7 @@ def query():
     # Table scan 1: Populate mf_struct with distinct values of grouping attributes
     for row in table:
         pos = lookup(row)
+        #if not pos:
         if pos == -1:
             add(row)
     

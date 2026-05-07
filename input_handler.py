@@ -112,9 +112,9 @@ class InputHandler:
         n = self.__read_num_group_vars(input("Number of grouping variables (n): "))
         V = self.__read_group_attrs(input("Grouping attributes (V): "))
         F = self.__read_aggregates(input("Vector of aggregates (F): "))
-        o = self.__read_group_var_preds(input("Grouping variable predicates: (σ): "))
+        sigma = self.__read_group_var_preds(input("Grouping variable predicates: (σ): "))
         G = self.__read_having(input("Having condition: "))
-        return Phi(S, n, V, F, o, G)
+        return Phi(S, n, V, F, sigma, G)
     
     def __read_select_attrs(self, S: str):
         '''Reads a string S of select attributes separated by commas'''
@@ -131,9 +131,9 @@ class InputHandler:
         '''Reads a string F of aggregates separated by commas'''
         return self.__parse_comma_separated_list(F)
 
-    def __read_group_var_preds(self, o: str):
-        '''Reads a string o of group variable predicates separated by commas'''
-        return self.__parse_comma_separated_list(o)
+    def __read_group_var_preds(self, sigma: str):
+        '''Reads a string sigma of group variable predicates separated by commas'''
+        return self.__parse_comma_separated_list(sigma)
     
     def __read_having(self, G: str):
         '''Reads a string G of a having clause predicate'''

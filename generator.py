@@ -11,6 +11,8 @@ import sys
 from input_handler import InputHandler
 from phi import Phi
 
+DEBUG = True
+
 sales_schema = {
     "cust": "str",
     "prod": "str",
@@ -22,6 +24,18 @@ sales_schema = {
     "date": "str"
 }
 
+def mf_struct(i: str, attr: str):
+    """
+    Generates python code to access the attribute at the ith element of the mf_struct.
+    """
+    return f"mf_struct[{i}].{attr}"
+
+def row_proj(row_name: str, attr: str):
+    """
+    Generates python code to access an attribute of a tuple / row.
+    """
+    return f"{row_name}['{attr}']"
+
 def generate_code_from_pred_operand(i: int, op: str) -> str:
     """
     Generates python code snippet from a single predicate operand.
@@ -29,6 +43,7 @@ def generate_code_from_pred_operand(i: int, op: str) -> str:
     Ex. "1.state" -> "row['state']"
         "avg_2_quant -> 
     """
+    pass
 
 def generate_code_from_pred(i: int, phi: Phi) -> str:
     """
@@ -37,7 +52,77 @@ def generate_code_from_pred(i: int, phi: Phi) -> str:
     Ex. input: "1.product=product and 1.quant > avg_quant" -> 
         output: "row['product'] == mf_struct[pos].product and row['quant'] > mf_struct[pos].avg_quant"
     """
+    pass
 
+def generate_mf_struct_def(phi: Phi) -> str:
+    """
+    Generates python code to define the mf_struct.
+    """
+    # Constructing the mf_struct fields (V + F)
+    struct_fields = ""
+    for attr in phi.V:
+        struct_fields += f"\t{attr}: {sales_schema[attr]}\n"
+    for agg in phi.F:
+        struct_fields += f"\t{agg}: int\n"
+
+    # Code to define the mf_struct
+    return f"""
+@dataclass(slots=True)
+class MfStruct:
+{struct_fields}
+mf_struct = []
+    """
+
+
+def generate_helpers(phi: Phi) -> str:
+    """
+    Generates python helper functions for the generated program.
+    """
+    return f"""
+def lookup(cur_row):
+    '''Search for all indices in the mf_struct that match the current group'''
+    # indices = []
+    pos = -1
+    for i in range(len(mf_struct)):
+        if {" and ".join([f"{mf_struct('i', attr)} == {row_proj('cur_row', attr)}" for attr in phi.V])}:
+            return i
+        # if
+        #     indices.append(i)
+    # return indices
+    return pos
+
+def add(cur_row):
+    '''Adds a new entry in mf_struct corresponding to a newly found group by attribute value'''
+    mf_struct.append(MfStruct({", ".join(
+        [f"{attr}={row_proj('cur_row', attr)}" for attr in phi.V] +
+        [f"{aggr}={-1 if 'max' in aggr else 0}" for aggr in phi.F]
+    )}))
+
+def output():
+    '''Prints only the select attributes of mf_struct to stdout'''
+    mf_struct_table = [({', '.join([f"entry.{attr}" for attr in phi.S])}) for entry in mf_struct]
+    print(tabulate.tabulate(mf_struct_table, headers={phi.S}, tablefmt="psql"))
+    """
+
+def generate_body(phi: Phi) -> str:
+    """
+    Generates program logic within the main function.
+    """
+    # Code for first table scan to populate mf_struct
+    populate_mf_struct = """
+    # Table scan 1: Populate mf_struct with distinct values of grouping attributes
+    for row in table:
+        pos = lookup(row)
+        #if not pos:
+        if pos == -1:
+            add(row)
+    """
+
+    return f"""
+    for row in cur:
+        table.append(row)
+    {populate_mf_struct}
+    """
 
 def main():
     """
@@ -47,50 +132,11 @@ def main():
     """
 
     phi: Phi = InputHandler().get_phi_expr()
-    print(phi)
-
-    # Constructing the mf_struct fields (V + F)
-    struct_fields = ""
-    for attr in phi.V:
-        struct_fields += f"\t{attr}: {sales_schema[attr]}\n"
-    for agg in phi.F:
-        struct_fields += f"\t{agg}: int\n"
-
-    # Code to define the mf_struct
-    mf_struct = f"""
-@dataclass(slots=True)
-class MfStruct:
-{struct_fields}
-mf_struct = []
-"""
+    if DEBUG: print(phi)
     
-    # Database helper functions
-    helpers = f"""
-def lookup(cur_row):
-    '''Search for '''
-    indices = []
-    for i in range(len(mf_struct)):
-        # if {" and ".join([f"mf_struct[i].{attr} == cur_row['{attr}']" for attr in phi.V])}:
-        if {group_var_pred()}
-            indices.append(i)
-    return indices
-
-def add(cur_row):
-    '''Adds a new entry in mf_struct corresponding to a newly found group by attribute value'''
-    mf_struct.append(MfStruct({", ".join(
-        [f"{attr}=cur_row['{attr}']" for attr in phi.V] +
-        [f"{aggr}={-1 if 'max' in aggr else 0}" for aggr in phi.F]
-    )}))
-
-def output():
-    '''Prints only the select attributes of mf_struct to stdout'''
-    # print("{'   '.join([field for field in phi.S])}")
-    # for entry in mf_struct:
-    #     print(f"{'   '.join([f'{{entry.{field}}}' for field in phi.S])}")
-
-    mf_struct_table = [({', '.join([f"entry.{attr}" for attr in phi.S])}) for entry in mf_struct]
-    print(tabulate.tabulate(mf_struct_table, headers={phi.S}, tablefmt="psql"))
-"""
+    mf_struct = generate_mf_struct_def(phi)   # mf_struct definition
+    helpers = generate_helpers(phi)           # Database helper functions
+    body = generate_body(phi)                 # Program logic
     
     # # Code for first table scan to populate mf_struct
     # populate_mf_struct = """
@@ -101,20 +147,14 @@ def output():
     #         add(row)
     # """
 
-    emf_algorithm = ''.join([f"""
-    # Table scan {i+1} for grouping variable {i}
-    for row in table:
-        for entry in mf_struct:
-            if {generate_code_from_pred(i, phi)}:
-                {generate_code_update_aggrs(i, phi)}
+    # emf_algorithm = ''.join([f"""
+    # # Table scan {i+1} for grouping variable {i}
+    # for row in table:
+    #     for entry in mf_struct:
+    #         if {generate_code_from_pred(i, phi)}:
+    #             {generate_code_update_aggrs(i, phi)}
                 
-    """ for i in range(phi.n + 1)])
-
-    body = f"""
-    for row in cur:
-        table.append(row)
-    {emf_algorithm}
-    """
+    # """ for i in range(phi.n + 1)])
 
     # Note: The f allows formatting with variables.
     #       Also, note the indentation is preserved.
