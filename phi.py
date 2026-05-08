@@ -65,8 +65,14 @@ class Phi:
         """
         Returns the attribute associated with an aggregate
         Ex. 'sum_1_quant' -> 'quant'
+                'avg_quant' -> 'quant'
         """
-        return aggr.split('_')[2]
+        parts = aggr.split('_')
+
+        if len(parts) == 2:
+            # No grouping variable number, so the attribute is just the second part
+            return parts[1]
+        return parts[2] # Grouping variable number is present, so the attribute is the third part
     
     @staticmethod
     def __get_aggr_num(aggr: str) -> int:

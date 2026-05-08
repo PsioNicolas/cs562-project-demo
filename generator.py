@@ -13,6 +13,7 @@ Ex. avg_1_quant -> sum_1_quant, count_1_quant
 
 import subprocess
 import sys
+import re
 
 from input_handler import InputHandler
 from phi import Phi
@@ -59,24 +60,83 @@ def row_proj(row_name: str, attr: str) -> str:
 
 def generate_code_from_pred_operand(i: int, op: str) -> str:
     """
-    Generates python code snippet from a single predicate operand.
+    Converts one operand from a SQL-style condition into Python code.
 
-    Ex. "1.state" -> "row['state']"
-        "avg_2_quant -> 
+    Examples:
+        1.state -> row['state']
+        cust    -> mf_struct[i].cust
+        'NY'    -> 'NY'
+        2020    -> 2020
     """
-    pass
+    op = op.strip()
+
+    # If operand is a string constant, leave it unchanged Ex: 'NY'
+    if op.startswith("'") and op.endswith("'"):
+        return op
+
+    # If operand is a number, leave it unchanged Ex: 2020
+    if op.isdigit():
+        return op
+
+    # If operand is a grouping variable attribute (Ex: 1.state), convert it into the current row lookup
+    if "." in op:
+        gv, attr = op.split(".")
+        if gv.isdigit():
+            return row_proj("cur_row", attr)
+
+    # If operand is a grouping attribute (Ex: cust), compare against the mf_struct entry
+    if op in sales_schema:
+        return mf_struct("i", op)
+
+    # Otherwise return it as-is
+    return op
+    
 
 def generate_code_from_pred(i: int, phi: Phi, mf_index_name: str, row_name: str) -> str:
     """
     Generates python code snippet from a grouping variable predicate input by the user.
 
-    Ex. input: "1.product=product and 1.quant > avg_quant" -> 
-        output: "row['product'] == mf_struct[pos].product and row['quant'] > mf_struct[pos].avg_quant"
+    Ex. input: "1.product=product and 1.quant > avg_quant"
+        output: "mf_struct[i].product == cur_row['product'] and cur_row['quant'] > mf_struct[i].avg_quant"
     """
-    # Grouping variable 0
+
+    # Match the current row to the current mf_struct group
+    # Ex: mf_struct[i].cust == cur_row['cust']
+    group_match = " and ".join([
+        f"{mf_struct(mf_index_name, attr)} == {row_proj(row_name, attr)}"
+        for attr in phi.V
+    ])
+
+    # Grouping variable 0 only needs the group match
     if i == 0:
-        return f"{" and ".join([f"{mf_entry_proj(mf_index_name, attr)} == {row_proj(row_name, attr)}" for attr in phi.V])}"
-    return ""
+        return group_match
+
+    # Get the condition for this grouping variable
+    # sigma[0] is for grouping variable 1
+    pred = phi.sigma[i - 1].strip()
+
+    # Convert smart quotes into normal quotes
+    pred = pred.replace("‘", "'")
+    pred = pred.replace("’", "'")
+
+    # Fix SQL not-equal operator: SQL <> becomes Python !=
+    pred = pred.replace("<>", "!=")
+
+    # Replace SQL = with Python ==
+    pred = re.sub(r"(?<![<>=!])=(?!=)", "==", pred)
+
+    # Replace grouping variable references
+    # Ex: 1.state -> cur_row['state']
+    for attr in sales_schema:
+        pred = pred.replace(f"{i}.{attr}", row_proj(row_name, attr))
+
+    # Replace grouping attributes with mf_struct references
+    # Ex: cust -> mf_struct[i].cust
+    for attr in phi.V:
+        pred = re.sub(rf"\b{attr}\b", mf_struct(mf_index_name, attr), pred)
+
+    # Final condition must match the group and satisfy the predicate
+    return f"{group_match} and {pred}"
 
 def generate_mf_struct_def(phi: Phi) -> str:
     """
@@ -121,6 +181,37 @@ def generate_aggr_update_statement(aggr: str, phi: Phi, mf_index_name: str, row_
         case _:
             assert False, f"Invalid aggregate type: {aggr_type}"
 
+
+
+def generate_avg_code(phi: Phi) -> str:
+    """
+    Generates code to compute avg aggregates after scans.
+    avg_x = sum_x / count_x
+    """
+    lines = []
+
+    for aggr in phi.F:
+        if Phi.get_aggr_type(aggr) == "avg":
+            attr = Phi.get_aggr_attr(aggr)
+
+            # avg_quant -> sum_quant, count_quant
+            if aggr.count("_") == 1:
+                sum_aggr = f"sum_{attr}"
+                count_aggr = f"count_{attr}"
+            else:
+                gv = aggr.split("_")[1]
+                sum_aggr = f"sum_{gv}_{attr}"
+                count_aggr = f"count_{gv}_{attr}"
+
+            lines.append(f"if entry.{count_aggr} != 0:")
+            lines.append(f"    entry.{aggr} = entry.{sum_aggr} / entry.{count_aggr}")
+
+    if not lines:
+        return ""
+
+    return "for entry in mf_struct:\n" + indent("\n".join(lines), 1)
+
+
 def generate_code_to_update_aggrs(i: int, phi: Phi, mf_index_name: str, row_name: str) -> str:
     """
     Generates list of python statements to update each aggregate corresponding to grouping variable i
@@ -162,44 +253,58 @@ def generate_body(phi: Phi) -> str:
     """
     Generates program logic within the main function.
     """
-    # Code for first table scan to populate mf_struct
+
+    # First scan: build mf_struct with unique grouping attribute values
     populate_mf_struct = """
 # Table scan 0: Populate mf_struct with distinct values of grouping attributes
 for row in table:
     pos = lookup(row)
     if pos == -1:
         add(row)
-    """
+"""
 
     mf_index_name = "i"
     row_name = "cur_row"
 
-    # List of python code condition snippets for each grouping variable (including grouping variable 0)
+    # Generate all grouping variable conditions
     group_var_preds_code = [
-        generate_code_from_pred(i, phi, mf_index_name, row_name) 
-        for i in range(phi.n + 1)
-    ]
-    # List of python code snippets to update aggregates corresponding to each grouping variable
-    group_var_update_aggrs_code = [
-        generate_code_to_update_aggrs(i, phi, mf_index_name, row_name) 
+        generate_code_from_pred(i, phi, mf_index_name, row_name)
         for i in range(phi.n + 1)
     ]
 
-    emf_algorithm = ''.join([f"""
-# Table scan {i+1} for grouping variable {i}
+    # Generate all aggregate update statements
+    group_var_update_aggrs_code = [
+        generate_code_to_update_aggrs(i, phi, mf_index_name, row_name)
+        for i in range(phi.n + 1)
+    ]
+
+    emf_algorithm = ""
+
+    # Generate scans for grouping variables 1..n
+    start = 0 if phi.n == 0 else 1
+
+    for i in range(start, phi.n + 1):
+
+        # Join update statements into actual executable lines
+        update_code = "\n".join(group_var_update_aggrs_code[i])
+
+        emf_algorithm += f"""
+# Table scan {i} for grouping variable {i}
 for {row_name} in table:
     for {mf_index_name} in range(len(mf_struct)):
         if {group_var_preds_code[i]}:
-            {group_var_update_aggrs_code[i]}
+{indent(update_code, 3)}
+"""
 
-# Compute average at end of scan
-    """ for i in range(phi.n + 1)])
+    avg_code = generate_avg_code(phi)
 
     return f"""
 for row in cur:
     table.append(row)
 {populate_mf_struct}
-    """
+{emf_algorithm}
+{avg_code}
+"""
 
 def generate_program(mf_struct: str, helpers: str, body: str) -> str:
     """
