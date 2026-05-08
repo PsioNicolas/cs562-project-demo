@@ -1,4 +1,3 @@
-
 import os
 import psycopg2
 import psycopg2.extras
@@ -11,31 +10,36 @@ from dataclasses import dataclass
 @dataclass(slots=True)
 class MfStruct:
     cust: str
-    prod: str
-    avg_quant: int
-    sum_quant: int
-    count_quant: int
-    max_quant: int
+    sum_1_quant: int
+    avg_1_quant: int
+    count_1_quant: int
+    sum_2_quant: int
+    sum_3_quant: int
+    avg_3_quant: int
+    count_3_quant: int
 
 mf_struct = []
-    
 
 def lookup(cur_row):
     '''Search for all indices in the mf_struct that match the current group'''
     for i in range(len(mf_struct)):
-        if mf_struct[i].cust == cur_row['cust'] and mf_struct[i].prod == cur_row['prod']:
+        if mf_struct[i].cust == cur_row['cust']:
             return i
     return -1
 
 def add(cur_row):
     '''Adds a new entry in mf_struct corresponding to a newly found group by attribute value'''
-    mf_struct.append(MfStruct(cust=cur_row['cust'], prod=cur_row['prod'], avg_quant=0, sum_quant=0, count_quant=0, max_quant=-1))
+    mf_struct.append(MfStruct(cust=cur_row['cust'], sum_1_quant=0, avg_1_quant=0, count_1_quant=0, sum_2_quant=0, sum_3_quant=0, avg_3_quant=0, count_3_quant=0))
 
 def output():
     '''Prints only the select attributes of mf_struct to stdout'''
-    mf_struct_table = [(entry.cust, entry.prod, entry.avg_quant, entry.max_quant) for entry in mf_struct]
-    print(tabulate.tabulate(mf_struct_table, headers=['cust', 'prod', 'avg_quant', 'max_quant'], tablefmt="psql"))
-    
+    mf_struct_table = [{
+        'cust': entry.cust,
+        'sum_1_quant': entry.sum_1_quant,
+        'sum_2_quant': entry.sum_2_quant,
+        'sum_3_quant': entry.sum_3_quant
+    } for entry in mf_struct]
+    print(tabulate.tabulate(mf_struct_table, headers="keys", tablefmt="psql"))
 
 def query():
     load_dotenv()
@@ -49,44 +53,55 @@ def query():
     cur = conn.cursor()
     cur.execute("SELECT * FROM sales")
     
-    table = []
-    for row in cur:
-        table.append(row)
-
-
+    table = cur.fetchall()
 
     # Table scan 0: Populate mf_struct with distinct values of grouping attributes
     for row in table:
         pos = lookup(row)
         if pos == -1:
             add(row)
-    
-
 
     # Table scan 1 for grouping variable 0
     for cur_row in table:
         for i in range(len(mf_struct)):
-            if mf_struct[i].cust == cur_row['cust'] and mf_struct[i].prod == cur_row['prod']:
+            if cur_row['cust'] == mf_struct[i].cust:
 
-                mf_struct[i].sum_quant += cur_row['quant']
-                mf_struct[i].count_quant += 1
-                if mf_struct[i].max_quant < cur_row['quant']: mf_struct[i].max_quant = cur_row['quant']
-    
 
-    # Compute averages for grouping variable 0 at end of scan
+    # Table scan 2 for grouping variable 1
+    for cur_row in table:
+        for i in range(len(mf_struct)):
+            if cur_row['state']=='NY':
+                mf_struct[i].sum_1_quant += cur_row['quant']
+                mf_struct[i].count_1_quant += 1
+    # Compute averages for grouping variable 1 at end of scan
     for i in range(len(mf_struct)):
-        mf_struct[i].avg_quant = mf_struct[i].sum_quant / mf_struct[i].count_quant
-    
-        
-    
-    
+        mf_struct[i].avg_1_quant = mf_struct[i].sum_1_quant / mf_struct[i].count_1_quant
+
+
+    # Table scan 3 for grouping variable 2
+    for cur_row in table:
+        for i in range(len(mf_struct)):
+            if cur_row['state']=='NJ':
+                mf_struct[i].sum_2_quant += cur_row['quant']
+
+
+    # Table scan 4 for grouping variable 3
+    for cur_row in table:
+        for i in range(len(mf_struct)):
+            if cur_row['state']=='CT':
+                mf_struct[i].sum_3_quant += cur_row['quant']
+                mf_struct[i].count_3_quant += 1
+    # Compute averages for grouping variable 3 at end of scan
+    for i in range(len(mf_struct)):
+        mf_struct[i].avg_3_quant = mf_struct[i].sum_3_quant / mf_struct[i].count_3_quant
+
     return tabulate.tabulate(table,
                         headers="keys", tablefmt="psql")
 
 def main():
-    query()
+    table = query()
     output()
+    return table
     
 if "__main__" == __name__:
     main()
-    

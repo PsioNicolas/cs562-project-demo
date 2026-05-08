@@ -13,6 +13,7 @@ Ex. avg_1_quant -> sum_1_quant, count_1_quant
 
 import subprocess
 import sys
+import re
 
 import input_handler as InputHandler
 from phi import Phi
@@ -57,26 +58,84 @@ def row_proj(row_name: str, attr: str) -> str:
     """
     return f"{row_name}['{attr}']"
 
-def generate_code_from_pred_operand(i: int, op: str) -> str:
+def generate_code_from_pred_operand(i: int, op: str, row_name: str) -> str:
     """
     Generates python code snippet from a single predicate operand.
-
-    Ex. "1.state" -> "row['state']"
-        "avg_2_quant -> 
+    
+    Ex. 1.state -> row['state']
+        cust    -> mf_struct[i].cust
+        'NY'    -> 'NY'
+        2020    -> 2020
     """
-    pass
+    op = op.strip()
+
+    # If operand is a string constant, leave it unchanged Ex: 'NY'
+    if op.startswith("'") and op.endswith("'"):
+        return op
+
+    # If operand is a number, leave it unchanged Ex: 2020
+    if op.isdigit():
+        return op
+
+    # If operand is a grouping variable attribute (Ex: 1.state), convert it into the current row lookup
+    if "." in op:
+        gv, attr = op.split(".")
+        if gv.isdigit():
+            return row_proj(row_name, attr)
+
+    # If operand is a grouping attribute (Ex: cust), compare against the mf_struct entry
+    if op in sales_schema:
+        return mf_struct("i", op)
+
+    return op
 
 def generate_code_from_pred(i: int, phi: Phi, mf_index_name: str, row_name: str) -> str:
     """
     Generates python code snippet from a grouping variable predicate input by the user.
 
-    Ex. input: "1.product=product and 1.quant > avg_quant" -> 
-        output: "row['product'] == mf_struct[pos].product and row['quant'] > mf_struct[pos].avg_quant"
+    Ex. input: "1.product=product and 1.quant > avg_quant"
+        output: "row['product'] == mf_struct[i].product and row['quant'] > mf_struct[i].avg_quant"
     """
-    # Grouping variable 0
+    # # Grouping variable 0
+    # if i == 0:
+    #     return f"{' and '.join([f'{mf_struct(mf_index_name, attr)} == {row_proj(row_name, attr)}' for attr in phi.V])}"
+    # return ""
+
+    # Grouping variable 0 only needs the group match
     if i == 0:
-        return f"{' and '.join([f'{mf_struct(mf_index_name, attr)} == {row_proj(row_name, attr)}' for attr in phi.V])}"
-    return ""
+        # Match the current row to the current mf_struct group
+        # Ex: row['cust'] == mf_struct[i].cust
+        group_match = " and ".join([
+            f"{row_proj(row_name, attr)} == {mf_struct(mf_index_name, attr)}"
+            for attr in phi.V
+        ])
+        return group_match
+
+    # Get the condition for this grouping variable
+    # sigma[0] is for grouping variable 1
+    pred = phi.sigma[i - 1]
+
+    # Convert smart quotes into normal quotes
+    pred = pred.replace("‘", "'")
+    pred = pred.replace("’", "'")
+
+    # Fix SQL not-equal operator: SQL <> becomes Python !=
+    pred = pred.replace("<>", "!=")
+
+    # Replace SQL = with Python ==
+    pred = re.sub(r"(?<![<>=!])=(?!=)", "==", pred)
+
+    # Replace grouping variable references
+    # Ex: 1.state -> row['state']
+    for attr in sales_schema:
+        pred = pred.replace(f"{i}.{attr}", row_proj(row_name, attr))
+
+    # Replace grouping attributes with mf_struct references
+    # Ex: cust -> mf_struct[i].cust
+    for attr in phi.V:
+        pred = re.sub(rf"\b{attr}\b", mf_struct(mf_index_name, attr), pred)
+
+    return pred
 
 def generate_mf_struct_def(phi: Phi) -> str:
     """
@@ -96,7 +155,7 @@ class MfStruct:
 {indent(struct_fields)}
 
 mf_struct = []
-    """
+    """.strip()
 
 def generate_aggr_update_statement(aggr: str, phi: Phi, mf_index_name: str, row_name: str) -> str:
     """
@@ -125,23 +184,31 @@ def generate_code_to_update_aggrs(i: int, phi: Phi, mf_index_name: str, row_name
     """
     Generates python code to update each aggregate corresponding to grouping variable i
     """
-    code = ""
+    code = []
 
     aggrs = phi.get_group_var_aggrs(i)
     for aggr in aggrs:
-        code += (generate_aggr_update_statement(aggr, phi, mf_index_name, row_name)) + '\n'
+        statement = generate_aggr_update_statement(aggr, phi, mf_index_name, row_name)
+        if statement: code.append(statement)
+    code = '\n'.join(code)
 
-    return code
+    return code.strip()
 
 def generate_helpers(phi: Phi) -> str:
     """
     Generates python helper functions for the generated program.
     """
+    # Lookup condition to check if row is in the mf_struct group
+    row_is_part_of_group = " and ".join([f"{mf_struct('i', attr)} == {row_proj('cur_row', attr)}" for attr in phi.V])
+
+    # For output to convert mf_struct to table output
+    mf_struct_dict = ",\n".join([f"'{attr}': {mf_entry_proj('entry', attr)}" for attr in phi.S])
+
     return f"""
 def lookup(cur_row):
     '''Search for all indices in the mf_struct that match the current group'''
     for i in range(len(mf_struct)):
-        if {" and ".join([f"{mf_struct('i', attr)} == {row_proj('cur_row', attr)}" for attr in phi.V])}:
+        if {row_is_part_of_group}:
             return i
     return -1
 
@@ -154,9 +221,11 @@ def add(cur_row):
 
 def output():
     '''Prints only the select attributes of mf_struct to stdout'''
-    mf_struct_table = [({', '.join([mf_entry_proj("entry", attr) for attr in phi.S])}) for entry in mf_struct]
-    print(tabulate.tabulate(mf_struct_table, headers={phi.S}, tablefmt="psql"))
-    """
+    mf_struct_table = [{{
+{indent(mf_struct_dict, 2)}
+    }} for entry in mf_struct]
+    print(tabulate.tabulate(mf_struct_table, headers="keys", tablefmt="psql"))
+    """.strip()
 
 def generate_emf_table_scan(i: int, mf_index_name: str, row_name: str, pred_code: str, update_aggr_code: str) -> str:
     """
@@ -168,7 +237,7 @@ for {row_name} in table:
     for {mf_index_name} in range(len(mf_struct)):
         if {pred_code}:
 {indent(update_aggr_code, 3)}
-    """
+    """.strip()
 
 def generate_calculate_avgs(i: int, phi: Phi, mf_index_name: str) -> str:
     """
@@ -190,7 +259,7 @@ def generate_calculate_avgs(i: int, phi: Phi, mf_index_name: str) -> str:
 # Compute averages for grouping variable {i} at end of scan
 for {mf_index_name} in range(len(mf_struct)):
 {indent(avg_updates)}
-    """
+    """.strip()
 
 def generate_body(phi: Phi) -> str:
     """
@@ -203,7 +272,7 @@ for row in table:
     pos = lookup(row)
     if pos == -1:
         add(row)
-    """
+    """.strip()
 
     mf_index_name = "i"
     row_name = "cur_row"
@@ -232,14 +301,15 @@ for row in table:
         emf_algorithm.append(f"""
 {table_scan}
 {compute_avgs}
-        """)
+        """.strip())
     # Join all scans
-    emf_algorithm = '\n'.join(emf_algorithm)
+    emf_algorithm = '\n\n\n'.join(emf_algorithm)
 
     return f"""
 {populate_mf_struct}
+
 {emf_algorithm}
-    """
+    """.strip()
 
 def generate_program(mf_struct: str, helpers: str, body: str) -> str:
     """
@@ -254,7 +324,9 @@ from dotenv import load_dotenv
 from dataclasses import dataclass
 
 # DO NOT EDIT THIS FILE, IT IS GENERATED BY generator.py
+
 {mf_struct}
+
 {helpers}
 
 def query():
@@ -269,22 +341,25 @@ def query():
     cur = conn.cursor()
     cur.execute("SELECT * FROM sales")
     
-    table = []
-    for row in cur:
-        table.append(row)
+    table = cur.fetchall()
 
 {indent(body)}
-    
+
     return tabulate.tabulate(table,
                         headers="keys", tablefmt="psql")
 
 def main():
-    query()
+    table = query()
     output()
+    return table
     
 if "__main__" == __name__:
     main()
-    """
+    """.strip()
+
+def file_name() -> str:
+    '''Returns name of if there is a command line argument'''
+    return sys.argv[1] if len(sys.argv) >= 2 else ""
 
 def main():
     """
@@ -292,14 +367,16 @@ def main():
     needed to run the query. That generated code should be saved to a 
     file (e.g. _generated.py) and then run.
     """
-
-    phi: Phi = InputHandler.get_phi_expr()
+    phi: Phi = InputHandler.get_phi_expr(file_name())
     if DEBUG: print(phi)
     
     mf_struct = generate_mf_struct_def(phi)                # mf_struct definition
     helpers = generate_helpers(phi)                        # Database helper functions
     body = generate_body(phi)                              # Program logic
     program = generate_program(mf_struct, helpers, body)   # Whole program
+
+    # Collapse multiple newlines to a maximum of three
+    # program = re.sub(r"\n{4,}", "\n\n\n", program)
 
     # Write the generated code to a file
     open("_generated.py", "w").write(program)

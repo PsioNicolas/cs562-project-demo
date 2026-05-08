@@ -44,11 +44,12 @@ For V, F, σ, or G, you can type NONE if they are not part of the expression.
 
 from phi import Phi
 
-def get_phi_expr() -> Phi:
+def get_phi_expr(file_name) -> Phi:
     """
     Gets phi operands from a file or from manual input
     """
-    file_name = input("Enter a file path to a phi expression or press enter to input each operand manually: ").strip()
+    if not file_name.strip():
+        file_name = input("Enter a file path to a phi expression or press enter to input each operand manually: ").strip()
     
     phi: Phi = None
     try:

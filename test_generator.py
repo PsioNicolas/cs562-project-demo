@@ -3,10 +3,13 @@ from _generated import query as _generated
 
 from sql import query as sql
 
+import sys
+
 
 def test_generator():
     # Generate the file
-    generator()
+    phi_expr_file = sys.argv[1]
+    generator(phi_expr_file)
 
     # Compare the output of your generated code to the output of the actual SQL query
     # Note: This only works for standard queries, not ESQL queries.

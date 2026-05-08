@@ -23,8 +23,8 @@ def query():
     # simple_query.txt
     cur.execute("select cust, prod, avg(quant), max(quant) from sales where year=2020 group by cust, prod")
 
-    return tabulate.tabulate(cur.fetchall(),
-                             headers="keys", tablefmt="psql")
+    return tabulate.tabulate([row.values() for row in cur.fetchall()],
+                             headers=['cust', 'prod', 'avg_quant', 'max_quant'], tablefmt="psql")
 
 
 def main():

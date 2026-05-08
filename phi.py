@@ -85,6 +85,7 @@ class Phi:
         Returns the aggregate type, either sum, avg, count, or max
         The type is specified at the beginning of the aggregate string
         Ex. 'sum_1_quant' -> 'sum'
+            'avg_quant' -> 'quant'
         """
         return aggr.split('_', 1)[0]
     
