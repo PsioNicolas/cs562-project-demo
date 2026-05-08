@@ -1,0 +1,6 @@
+cust, count_1_quant
+1
+cust
+count_1_quant
+1.state = 'NY'
+NONE

@@ -1,0 +1,6 @@
+cust, sum_1_quant, sum_2_quant, max_3_quant
+3
+cust
+sum_1_quant, sum_2_quant, max_3_quant
+1.state='NY', 2.state='NJ', 3.state='CT'
+NONE

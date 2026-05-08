@@ -1,0 +1,6 @@
+cust, sum_1_quant, sum_2_quant
+2
+cust
+sum_1_quant, sum_2_quant
+1.state='NY', 2.state='NJ'
+sum_1_quant > sum_2_quant
