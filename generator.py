@@ -17,7 +17,7 @@ import sys
 import input_handler as InputHandler
 from phi import Phi
 
-DEBUG = True
+DEBUG = False
 
 sales_schema = {
     "cust": "str",
@@ -75,7 +75,7 @@ def generate_code_from_pred(i: int, phi: Phi, mf_index_name: str, row_name: str)
     """
     # Grouping variable 0
     if i == 0:
-        return f"{" and ".join([f"{mf_entry_proj(mf_index_name, attr)} == {row_proj(row_name, attr)}" for attr in phi.V])}"
+        return f"{' and '.join([f'{mf_struct(mf_index_name, attr)} == {row_proj(row_name, attr)}' for attr in phi.V])}"
     return ""
 
 def generate_mf_struct_def(phi: Phi) -> str:
@@ -170,14 +170,26 @@ for {row_name} in table:
 {indent(update_aggr_code, 3)}
     """
 
-def generate_calculate_avgs(i: int, mf_index_name: str) -> str:
+def generate_calculate_avgs(i: int, phi: Phi, mf_index_name: str) -> str:
     """
-    Generates python code to update averages in a single row corresponding to grouping variable i
+    Generates python code to update averages in the entire mf_struct corresponding to grouping variable i
     """
+    # Get all 'avg' attributes in the row to update
+    avgs = phi.get_group_var_avgs(i)
+
+    avg_updates = []
+    # Update avgs in a row according to previously calculated sum and count
+    for avg in avgs:
+        sum = mf_struct(mf_index_name, Phi.change_aggr_type(avg, 'sum'))
+        count = mf_struct(mf_index_name, Phi.change_aggr_type(avg, 'count'))
+        # TODO: Don't need to calculate this every time
+        avg_updates.append(f"{mf_struct(mf_index_name, avg)} = {sum} / {count}")
+    avg_updates = '\n'.join(avg_updates)
+
     return f"""
 # Compute averages for grouping variable {i} at end of scan
 for {mf_index_name} in range(len(mf_struct)):
-
+{indent(avg_updates)}
     """
 
 def generate_body(phi: Phi) -> str:
@@ -214,7 +226,7 @@ for row in table:
         table_scan = generate_emf_table_scan(
             i, mf_index_name, row_name, group_var_preds_code[i], group_var_update_aggrs_code[i]
         )
-        compute_avgs = generate_calculate_avgs(i, mf_index_name) if phi.gv_computes_avg(i) else ""
+        compute_avgs = generate_calculate_avgs(i, phi, mf_index_name) if phi.gv_computes_avg(i) else ""
 
         # Scan over table to update aggregates for this grouping variable
         emf_algorithm.append(f"""
@@ -225,8 +237,6 @@ for row in table:
     emf_algorithm = '\n'.join(emf_algorithm)
 
     return f"""
-for row in cur:
-    table.append(row)
 {populate_mf_struct}
 {emf_algorithm}
     """

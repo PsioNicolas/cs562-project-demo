@@ -25,7 +25,7 @@ class Phi:
 
             # If there's an average, add sum and count aggregates to new list
             if Phi.get_aggr_type(aggr) == 'avg':
-                suffix = Phi.___create_aggr_suffix(gv, attr)
+                suffix = Phi.__create_aggr_suffix(gv, attr)
                 sum_aggr = f"sum_{suffix}"
                 count_aggr = f"count_{suffix}"
                 # Only add them if they do not exist
@@ -34,10 +34,10 @@ class Phi:
 
         self.S = S
         self.n = n
-        self.V = V
+        self.V = V if V else []
         self.F = new_F
-        self.sigma = sigma
-        self.G = G
+        self.sigma = sigma if sigma else []
+        self.G = G if G else ""
     
     def __repr__(self):
         '''Override for debug printing purposes'''
@@ -51,6 +51,13 @@ class Phi:
                 aggrs.append(aggr)
         return aggrs
     
+    def get_group_var_avgs(self, i: int) -> list[str]:
+        '''Returns list of strings of avg aggregates corresponding to grouping variable i'''
+        return list(filter(
+            lambda aggr: Phi.get_aggr_type(aggr) == 'avg' and Phi.__get_aggr_num(aggr) == i,
+            self.get_group_var_aggrs(i)
+        ))
+    
     def gv_computes_avg(self, i: int) -> bool:
         """
         Returns True if grouping variable i has an 'avg' aggregate associated with it
@@ -61,6 +68,16 @@ class Phi:
             Phi.get_aggr_type(aggr) == 'avg' and Phi.__get_aggr_num(aggr) == i
             for aggr in self.F
         )
+    
+    @staticmethod
+    def change_aggr_type(aggr: str, type: str) -> str:
+        """
+        Returns an aggregate but with the aggregate type replaced
+        Ex. aggr = 'avg_1_quant', type = sum -> 'sum_1_quant'
+        """
+        sections = aggr.split('_', 1)
+        suffix = sections[1]
+        return f"{type}_{suffix}"
     
     @staticmethod
     def get_aggr_type(aggr: str) -> str:
@@ -77,7 +94,7 @@ class Phi:
         Returns the attribute associated with an aggregate
         Ex. 'sum_1_quant' -> 'quant'
         """
-        return aggr.split('_')[2]
+        return aggr.split('_')[-1]
     
     @staticmethod
     def __get_aggr_num(aggr: str) -> int:
@@ -92,7 +109,7 @@ class Phi:
         return int(digits) if digits else 0
     
     @staticmethod
-    def ___create_aggr_suffix(i: int, attr: str) -> str:
+    def __create_aggr_suffix(i: int, attr: str) -> str:
         """
         Returns the suffix / ending of an aggregate string based on the grouping variable i and the attribute
         Ex. i = 0, attr = 'quant' -> 'quant'

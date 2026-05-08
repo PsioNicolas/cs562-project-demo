@@ -1,3 +1,4 @@
+
 import os
 import psycopg2
 import psycopg2.extras
@@ -9,29 +10,26 @@ from dataclasses import dataclass
 
 @dataclass(slots=True)
 class MfStruct:
-	cust: str
-	prod: str
-	avg_quant: int
-	max_quant: int
+    cust: str
+    prod: str
+    avg_quant: int
+    sum_quant: int
+    count_quant: int
+    max_quant: int
 
 mf_struct = []
     
 
 def lookup(cur_row):
     '''Search for all indices in the mf_struct that match the current group'''
-    # indices = []
-    pos = -1
     for i in range(len(mf_struct)):
         if mf_struct[i].cust == cur_row['cust'] and mf_struct[i].prod == cur_row['prod']:
             return i
-        # if
-        #     indices.append(i)
-    # return indices
-    return pos
+    return -1
 
 def add(cur_row):
     '''Adds a new entry in mf_struct corresponding to a newly found group by attribute value'''
-    mf_struct.append(MfStruct(cust=cur_row['cust'], prod=cur_row['prod'], avg_quant=0, max_quant=-1))
+    mf_struct.append(MfStruct(cust=cur_row['cust'], prod=cur_row['prod'], avg_quant=0, sum_quant=0, count_quant=0, max_quant=-1))
 
 def output():
     '''Prints only the select attributes of mf_struct to stdout'''
@@ -52,24 +50,40 @@ def query():
     cur.execute("SELECT * FROM sales")
     
     table = []
-    
     for row in cur:
         table.append(row)
-    
-    # Table scan 1: Populate mf_struct with distinct values of grouping attributes
+
+
+
+    # Table scan 0: Populate mf_struct with distinct values of grouping attributes
     for row in table:
         pos = lookup(row)
-        #if not pos:
         if pos == -1:
             add(row)
     
+
+
+    # Table scan 1 for grouping variable 0
+    for cur_row in table:
+        for i in range(len(mf_struct)):
+            if mf_struct[i].cust == cur_row['cust'] and mf_struct[i].prod == cur_row['prod']:
+
+                mf_struct[i].sum_quant += cur_row['quant']
+                mf_struct[i].count_quant += 1
+                if mf_struct[i].max_quant < cur_row['quant']: mf_struct[i].max_quant = cur_row['quant']
+    
+
+    # Compute averages for grouping variable 0 at end of scan
+    for i in range(len(mf_struct)):
+        mf_struct[i].avg_quant = mf_struct[i].sum_quant / mf_struct[i].count_quant
+    
+        
     
     
     return tabulate.tabulate(table,
                         headers="keys", tablefmt="psql")
 
 def main():
-    #print(query())
     query()
     output()
     

@@ -118,6 +118,7 @@ def _read_select_attrs(S: str):
     return _parse_comma_separated_list(S)
 
 def _read_num_group_vars(n: str):
+    '''Reads a string n of the number of grouping variables'''
     return int(n)
 
 def _read_group_attrs(V: str):
