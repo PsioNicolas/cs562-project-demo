@@ -2,7 +2,7 @@
 cust, prod, avg_quant, max_quant
 
 # NUMBER OF GROUPING VARIABLES(n):
-0
+1
 
 # GROUPING ATTRIBUTES(V):
 cust, prod

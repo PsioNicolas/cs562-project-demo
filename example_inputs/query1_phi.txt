@@ -1,0 +1,6 @@
+cust, prod, avg_quant, max_quant
+0
+cust, prod
+avg_quant, max_quant
+NONE
+NONE

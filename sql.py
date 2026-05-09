@@ -22,10 +22,11 @@ def query(query):
     
     cur.execute(query)
 
-    return cur.fetchall()
+    output = cur.fetchall()
+    print("Normal SQL:")
+    print(tabulate.tabulate(output, headers="keys", tablefmt="psql"))
 
-    # return tabulate.tabulate([row.values() for row in cur.fetchall()],
-    #                          headers=['cust', 'prod', 'avg_quant', 'max_quant'], tablefmt="psql")
+    return output
 
 
 def main():

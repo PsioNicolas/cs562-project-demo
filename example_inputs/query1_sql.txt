@@ -1,0 +1,3 @@
+select cust, prod, avg(quant) as avg_quant, max(quant) as max_quant
+from sales
+group by cust, prod

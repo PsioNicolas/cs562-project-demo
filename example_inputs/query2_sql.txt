@@ -1,0 +1,9 @@
+select
+    cust,
+    (
+        select count(*)
+        from sales s
+        where s.state = 'NY'
+    ) as count_1_quant
+FROM sales
+GROUP BY cust;

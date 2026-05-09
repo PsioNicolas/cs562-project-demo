@@ -9,8 +9,6 @@ to facilitate computation, unless they already exist.
 Ex. avg_1_quant -> sum_1_quant, count_1_quant
 """
 
-# TODO: Handle "NONE" input cases
-
 import subprocess
 import sys
 import re
@@ -248,7 +246,7 @@ def generate_emf_table_scan(i: int, mf_index_name: str, row_name: str, pred_code
     Generates python code to perform one scan of the table to compute aggregates for grouping variable i
     """
     return f"""
-# Table scan {i+1} for grouping variable {i}
+# Table scan for grouping variable {i}
 for {row_name} in table:
     for {mf_index_name} in range(len(mf_struct)):
         if {pred_code}:
@@ -388,13 +386,13 @@ def file_name() -> str:
     '''Returns name of if there is a command line argument'''
     return sys.argv[1] if len(sys.argv) >= 2 else ""
 
-def main():
+def main(file_name):
     """
     This is the generator code. It should take in the MF structure and generate the code
     needed to run the query. That generated code should be saved to a 
     file (e.g. _generated.py) and then run.
     """
-    phi: Phi = InputHandler.get_phi_expr(file_name())
+    phi: Phi = InputHandler.get_phi_expr(file_name)
     if DEBUG: print(phi)
     
     mf_struct = generate_mf_struct_def(phi)                # mf_struct definition
@@ -412,4 +410,4 @@ def main():
 
 
 if "__main__" == __name__:
-    main()
+    main(file_name())

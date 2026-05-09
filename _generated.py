@@ -11,8 +11,6 @@ from dataclasses import dataclass
 class MfStruct:
     cust: str
     count_1_quant: int
-    sum_2_quant: int
-    max_3_quant: int
 
 mf_struct = []
 
@@ -25,15 +23,13 @@ def lookup(cur_row):
 
 def add(cur_row):
     '''Adds a new entry in mf_struct corresponding to a newly found group by attribute value'''
-    mf_struct.append(MfStruct(cust=cur_row['cust'], count_1_quant=0, sum_2_quant=0, max_3_quant=-1))
+    mf_struct.append(MfStruct(cust=cur_row['cust'], count_1_quant=0))
 
 def output():
     '''Returns only the select attributes of mf_struct'''
     mf_struct_table = [{
         'cust': entry.cust,
-        'count_1_quant': entry.count_1_quant,
-        'sum_2_quant': entry.sum_2_quant,
-        'max_3_quant': entry.max_3_quant
+        'count_1_quant': entry.count_1_quant
     } for entry in mf_struct]
     return mf_struct_table
 
@@ -61,25 +57,11 @@ def query():
         if pos == -1:
             add(row)
 
-    # Table scan 2 for grouping variable 1
+    # Table scan for grouping variable 1
     for cur_row in table:
         for i in range(len(mf_struct)):
             if cur_row['state'] == 'NY':
                 mf_struct[i].count_1_quant += 1
-
-
-    # Table scan 3 for grouping variable 2
-    for cur_row in table:
-        for i in range(len(mf_struct)):
-            if cur_row['state'] == 'NJ':
-                mf_struct[i].sum_2_quant += cur_row['quant']
-
-
-    # Table scan 4 for grouping variable 3
-    for cur_row in table:
-        for i in range(len(mf_struct)):
-            if cur_row['state'] == 'CT':
-                if mf_struct[i].max_3_quant < cur_row['quant']: mf_struct[i].max_3_quant = cur_row['quant']
 
     return output()
 
