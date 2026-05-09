@@ -7,6 +7,8 @@ either from a file or from manual keyboard input.
 To compute the average, this program will spawn two new "sum" and "count" aggregates
 to facilitate computation, unless they already exist.
 Ex. avg_1_quant -> sum_1_quant, count_1_quant
+
+You can provide a file as a command line argument, or just run the program and enter it after.
 """
 
 import subprocess
