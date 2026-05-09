@@ -1,3 +1,4 @@
+# Simple aggregate query
 cust, prod, avg_quant, max_quant
 0
 cust, prod

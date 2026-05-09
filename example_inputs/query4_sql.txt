@@ -1,0 +1,7 @@
+select
+    cust,
+    (select sum(quant) from sales s where s.state = 'NY') as sum_1_quant,
+    (select sum(quant) from sales s where s.state = 'NJ') as sum_2_quant
+from sales
+group by cust
+having (select sum(quant) from sales s where s.state = 'NY') > (select sum(quant) from sales s where s.state = 'NJ')

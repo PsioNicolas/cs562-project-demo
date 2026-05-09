@@ -1,3 +1,4 @@
+# Query with one grouping variable
 cust, count_1_quant
 1
 cust

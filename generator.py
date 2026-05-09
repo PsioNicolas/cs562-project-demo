@@ -56,36 +56,42 @@ def row_proj(row_name: str, attr: str) -> str:
     """
     return f"{row_name}['{attr}']"
 
-def generate_code_from_pred_operand(i: int, op: str, row_name: str) -> str:
+def generate_code_from_pred_token(i: int, tok: str, phi: Phi, mf_index_name: str, row_name: str) -> str:
     """
-    Generates python code snippet from a single predicate operand.
+    Generates python code snippet from a single predicate token (operator / operand).
     
     Ex. 1.state -> row['state']
         cust    -> mf_struct[i].cust
         'NY'    -> 'NY'
         2020    -> 2020
     """
-    op = op.strip()
+    tok = tok.strip()
+
+    # If operator is sql-style single equals or not equals, convert it to python-style
+    if tok == "=":
+        return "=="
+    if tok == "<>":
+        return "!="
 
     # If operand is a string constant, leave it unchanged Ex: 'NY'
-    if op.startswith("'") and op.endswith("'"):
-        return op
+    if tok.startswith("'") and tok.endswith("'"):
+        return tok
 
     # If operand is a number, leave it unchanged Ex: 2020
-    if op.isdigit():
-        return op
+    if tok.isdigit():
+        return tok
 
     # If operand is a grouping variable attribute (Ex: 1.state), convert it into the current row lookup
-    if "." in op:
-        gv, attr = op.split(".")
+    if "." in tok:
+        gv, attr = tok.split(".")
         if gv.isdigit():
             return row_proj(row_name, attr)
 
     # If operand is a grouping attribute (Ex: cust), compare against the mf_struct entry
-    if op in sales_schema:
-        return mf_struct("i", op)
+    if tok in sales_schema or tok in phi.F:
+        return mf_struct(mf_index_name, tok)
 
-    return op
+    return tok
 
 def generate_code_from_pred(i: int, phi: Phi, mf_index_name: str, row_name: str) -> str:
     """
@@ -106,46 +112,18 @@ def generate_code_from_pred(i: int, phi: Phi, mf_index_name: str, row_name: str)
 
     # Get the condition for this grouping variable
     # sigma[0] is for grouping variable 1
-    pred = phi.sigma[i - 1]
-
-    # Fix SQL not-equal operator: SQL <> becomes Python !=
-    pred = pred.replace("<>", "!=")
-
-    # Replace SQL = with Python ==
-    pred = re.sub(r"(?<![<>=!])=(?!=)", "==", pred)
-
-    # Replace grouping variable references
-    # Ex: 1.state -> row['state']
-    for attr in sales_schema:
-        pred = pred.replace(f"{i}.{attr}", row_proj(row_name, attr))
-
-    # Replace grouping attributes and aggregates with mf_struct references
-    # Ex: cust -> mf_struct[i].cust
-    for attr in phi.V + phi.F:
-        pred = re.sub(rf"\b{attr}\b", mf_struct(mf_index_name, attr), pred)
-
-    return pred
-
-def generate_having_condition(phi: Phi, mf_entry_name: str) -> str:
-    """
-    Generates python code snippet for "having" condition G
-
-    Ex. sum_1_quant = 2 * sum_2_quant -> entry.sum_1_quant == 2 * entry.sum_2_quant
-    """
-    pred = phi.G
-
-    # Fix SQL not-equal operator: SQL <> becomes Python !=
-    pred = pred.replace("<>", "!=")
-
-    # Replace SQL = with Python ==
-    pred = re.sub(r"(?<![<>=!])=(?!=)", "==", pred)
-
-    # Replace select attributes with mf_struct references
-    # Ex: cust -> entry.cust
-    for attr in phi.S:
-        pred = re.sub(rf"\b{attr}\b", mf_entry_proj(mf_entry_name, attr), pred)
+    pred = phi.sigma[i - 1] if i > 0 else phi.G   # Having predicate
     
-    return pred
+    # Split on whitespace and operators to get tokens (operands and operators)
+    pred_tokens = re.split(r"(\s+|!=|<=|>=|=|<>|<|>|\+|\*|\-)", pred)
+    # Don't get blank tokens
+    pred_tokens = [tok for tok in pred_tokens if tok.strip()]
+
+    # Generate code for each token and assemble python predicate
+    return " ".join([
+        generate_code_from_pred_token(i, tok, phi, mf_index_name, row_name)
+        for tok in pred_tokens
+    ])
 
 def generate_mf_struct_def(phi: Phi) -> str:
     """
@@ -321,13 +299,14 @@ for row in table:
     # Join all scans
     emf_algorithm = '\n\n\n'.join(emf_algorithm)
 
-    # Having condition
+    # Having condition (Arbitrarily represented by grouping variable -1)
     having = f"""
 # Having condition
-mf_struct[:] = list(filter(
-    lambda entry: {generate_having_condition(phi, 'entry')}, 
-    mf_struct
-))
+mf_struct_filtered = []
+for {mf_index_name} in range(len(mf_struct)):
+    if {generate_code_from_pred(-1, phi, mf_index_name, "")}:
+        mf_struct_filtered.append(mf_struct[{mf_index_name}])
+mf_struct[:] = mf_struct_filtered
 """.strip() if phi.G else ""
 
     return f"""

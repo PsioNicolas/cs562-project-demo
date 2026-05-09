@@ -1,0 +1,7 @@
+# Query with multiple grouping variables and aggregates
+cust, avg_quant, avg_1_quant, sum_1_quant, sum_2_quant, sum_3_quant, max_3_quant
+3
+cust
+avg_quant, avg_1_quant, sum_1_quant, sum_2_quant, sum_3_quant, max_3_quant
+1.state='NY' and 1.cust='Mia', 2.state='NJ', 3.state='CT'
+NONE

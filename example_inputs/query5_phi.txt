@@ -1,0 +1,18 @@
+# Query with grouping variable aggregate dependencies
+# SELECT ATTRIBUTE(S):
+prod, month, avg_quant, avg_1_quant, avg_2_quant
+
+# NUMBER OF GROUPING VARIABLES(n):
+2
+
+# GROUPING ATTRIBUTES(V):
+prod, month
+
+# F-VECT([F]):
+avg_quant, avg_1_quant, avg_2_quant
+
+# SELECT CONDITION-VECT([σ]):
+1.quant > avg_quant, 2.quant > avg_1_quant
+
+# HAVING_CONDITION(G):
+NONE

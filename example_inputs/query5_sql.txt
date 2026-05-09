@@ -1,0 +1,38 @@
+WITH gv0 AS (
+    SELECT 
+        prod,
+        month,
+        AVG(quant) AS avg_quant
+    FROM sales
+    GROUP BY prod, month
+),
+gv1 AS (
+    SELECT 
+        gv0.prod,
+        gv0.month,
+        AVG(s1.quant) AS avg_1_quant
+    FROM gv0
+    JOIN sales s1
+        ON s1.quant > gv0.avg_quant
+    GROUP BY gv0.prod, gv0.month
+),
+gv2 AS (
+    SELECT 
+        gv0.prod,
+        gv0.month,
+        AVG(s2.quant) AS avg_2_quant
+    FROM gv0
+    JOIN gv1 ON gv1.prod = gv0.prod AND gv1.month = gv0.month
+    JOIN sales s2
+        ON s2.quant > gv1.avg_1_quant
+    GROUP BY gv0.prod, gv0.month
+)
+SELECT
+    gv0.prod,
+    gv0.month,
+    gv0.avg_quant,
+    gv1.avg_1_quant,
+    gv2.avg_2_quant
+FROM gv0
+JOIN gv1 ON gv1.prod = gv0.prod AND gv1.month = gv0.month
+JOIN gv2 ON gv2.prod = gv0.prod AND gv2.month = gv0.month

@@ -1,0 +1,10 @@
+select
+    cust,
+    avg(quant) as avg_quant,
+    (select avg(quant) from sales s where s.state = 'NY' and s.cust = 'Mia') as avg_1_quant,
+    (select sum(quant) from sales s where s.state = 'NY' and s.cust = 'Mia') as sum_1_quant,
+    (select sum(quant) from sales s where s.state = 'NJ') as sum_2_quant,
+    (select sum(quant) from sales s where s.state = 'CT') as sum_3_quant,
+    (select max(quant) from sales s where s.state = 'CT') as max_3_quant
+from sales
+group by cust
