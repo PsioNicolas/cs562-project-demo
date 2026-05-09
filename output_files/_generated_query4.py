@@ -10,32 +10,28 @@ from dataclasses import dataclass
 @dataclass(slots=True)
 class MfStruct:
     cust: str
-    prod: str
-    avg_quant: int
-    sum_quant: int
-    count_quant: int
-    max_quant: int
+    sum_1_quant: int
+    sum_2_quant: int
 
 mf_struct = []
 
 def lookup(cur_row):
     '''Search for all indices in the mf_struct that match the current group'''
     for i in range(len(mf_struct)):
-        if mf_struct[i].cust == cur_row['cust'] and mf_struct[i].prod == cur_row['prod']:
+        if mf_struct[i].cust == cur_row['cust']:
             return i
     return -1
 
 def add(cur_row):
     '''Adds a new entry in mf_struct corresponding to a newly found group by attribute value'''
-    mf_struct.append(MfStruct(cust=cur_row['cust'], prod=cur_row['prod'], avg_quant=0, sum_quant=0, count_quant=0, max_quant=-1))
+    mf_struct.append(MfStruct(cust=cur_row['cust'], sum_1_quant=0, sum_2_quant=0))
 
 def output():
     '''Returns only the select attributes of mf_struct'''
     mf_struct_table = [{
         'cust': entry.cust,
-        'prod': entry.prod,
-        'avg_quant': entry.avg_quant,
-        'max_quant': entry.max_quant
+        'sum_1_quant': entry.sum_1_quant,
+        'sum_2_quant': entry.sum_2_quant
     } for entry in mf_struct]
     return mf_struct_table
 
@@ -63,16 +59,25 @@ def query():
         if pos == -1:
             add(row)
 
-    # Table scan for grouping variable 0
+    # Table scan for grouping variable 1
     for cur_row in table:
         for i in range(len(mf_struct)):
-            if cur_row['cust'] == mf_struct[i].cust and cur_row['prod'] == mf_struct[i].prod:
-                mf_struct[i].sum_quant += cur_row['quant']
-                mf_struct[i].count_quant += 1
-                if mf_struct[i].max_quant < cur_row['quant']: mf_struct[i].max_quant = cur_row['quant']
-    # Compute averages for grouping variable 0 at end of scan
+            if cur_row['state'] == 'NY':
+                mf_struct[i].sum_1_quant += cur_row['quant']
+
+
+    # Table scan for grouping variable 2
+    for cur_row in table:
+        for i in range(len(mf_struct)):
+            if cur_row['state'] == 'NJ':
+                mf_struct[i].sum_2_quant += cur_row['quant']
+
+    # Having condition
+    mf_struct_filtered = []
     for i in range(len(mf_struct)):
-        mf_struct[i].avg_quant = mf_struct[i].sum_quant / mf_struct[i].count_quant
+        if mf_struct[i].sum_1_quant > mf_struct[i].sum_2_quant:
+            mf_struct_filtered.append(mf_struct[i])
+    mf_struct[:] = mf_struct_filtered
 
     return output()
 
