@@ -5,7 +5,7 @@ import tabulate
 from dotenv import load_dotenv
 
 
-def query():
+def query(query):
     """
     Used for testing standard queries in SQL.
     """
@@ -20,15 +20,17 @@ def query():
     cur = conn.cursor()
     # cur.execute("SELECT * FROM sales WHERE quant > 10")
     
-    # simple_query.txt
-    cur.execute("select cust, prod, avg(quant), max(quant) from sales where year=2020 group by cust, prod")
+    cur.execute(query)
 
-    return tabulate.tabulate([row.values() for row in cur.fetchall()],
-                             headers=['cust', 'prod', 'avg_quant', 'max_quant'], tablefmt="psql")
+    return cur.fetchall()
+
+    # return tabulate.tabulate([row.values() for row in cur.fetchall()],
+    #                          headers=['cust', 'prod', 'avg_quant', 'max_quant'], tablefmt="psql")
 
 
 def main():
-    print(query())
+    #print(query())
+    query()
 
 
 if "__main__" == __name__:

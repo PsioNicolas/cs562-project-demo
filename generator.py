@@ -96,12 +96,7 @@ def generate_code_from_pred(i: int, phi: Phi, mf_index_name: str, row_name: str)
     Ex. input: "1.product=product and 1.quant > avg_quant"
         output: "row['product'] == mf_struct[i].product and row['quant'] > mf_struct[i].avg_quant"
     """
-    # # Grouping variable 0
-    # if i == 0:
-    #     return f"{' and '.join([f'{mf_struct(mf_index_name, attr)} == {row_proj(row_name, attr)}' for attr in phi.V])}"
-    # return ""
-
-    # Grouping variable 0 only needs the group match
+    # Grouping variable 0 is the "group by" group, not input by user
     if i == 0:
         # Match the current row to the current mf_struct group
         # Ex: row['cust'] == mf_struct[i].cust
@@ -115,10 +110,6 @@ def generate_code_from_pred(i: int, phi: Phi, mf_index_name: str, row_name: str)
     # sigma[0] is for grouping variable 1
     pred = phi.sigma[i - 1]
 
-    # Convert smart quotes into normal quotes
-    pred = pred.replace("‘", "'")
-    pred = pred.replace("’", "'")
-
     # Fix SQL not-equal operator: SQL <> becomes Python !=
     pred = pred.replace("<>", "!=")
 
@@ -130,11 +121,32 @@ def generate_code_from_pred(i: int, phi: Phi, mf_index_name: str, row_name: str)
     for attr in sales_schema:
         pred = pred.replace(f"{i}.{attr}", row_proj(row_name, attr))
 
-    # Replace grouping attributes with mf_struct references
+    # Replace grouping attributes and aggregates with mf_struct references
     # Ex: cust -> mf_struct[i].cust
-    for attr in phi.V:
+    for attr in phi.V + phi.F:
         pred = re.sub(rf"\b{attr}\b", mf_struct(mf_index_name, attr), pred)
 
+    return pred
+
+def generate_having_condition(phi: Phi, mf_entry_name: str) -> str:
+    """
+    Generates python code snippet for "having" condition G
+
+    Ex. sum_1_quant = 2 * sum_2_quant -> entry.sum_1_quant == 2 * entry.sum_2_quant
+    """
+    pred = phi.G
+
+    # Fix SQL not-equal operator: SQL <> becomes Python !=
+    pred = pred.replace("<>", "!=")
+
+    # Replace SQL = with Python ==
+    pred = re.sub(r"(?<![<>=!])=(?!=)", "==", pred)
+
+    # Replace select attributes with mf_struct references
+    # Ex: cust -> entry.cust
+    for attr in phi.S:
+        pred = re.sub(rf"\b{attr}\b", mf_entry_proj(mf_entry_name, attr), pred)
+    
     return pred
 
 def generate_mf_struct_def(phi: Phi) -> str:
@@ -204,7 +216,7 @@ def generate_helpers(phi: Phi) -> str:
     # For output to convert mf_struct to table output
     mf_struct_dict = ",\n".join([f"'{attr}': {mf_entry_proj('entry', attr)}" for attr in phi.S])
 
-    return f"""
+    return f""" 
 def lookup(cur_row):
     '''Search for all indices in the mf_struct that match the current group'''
     for i in range(len(mf_struct)):
@@ -220,11 +232,15 @@ def add(cur_row):
     )}))
 
 def output():
-    '''Prints only the select attributes of mf_struct to stdout'''
+    '''Returns only the select attributes of mf_struct'''
     mf_struct_table = [{{
 {indent(mf_struct_dict, 2)}
     }} for entry in mf_struct]
-    print(tabulate.tabulate(mf_struct_table, headers="keys", tablefmt="psql"))
+    return mf_struct_table
+
+def print_output(table):
+    '''Prints final table to stdout'''
+    print(tabulate.tabulate(table, headers="keys", tablefmt="psql"))
     """.strip()
 
 def generate_emf_table_scan(i: int, mf_index_name: str, row_name: str, pred_code: str, update_aggr_code: str) -> str:
@@ -291,6 +307,8 @@ for row in table:
 
     emf_algorithm = []
     for i in group_vars:
+        # Don't scan table if there are no aggregates to compute for this grouping variable
+        if not phi.get_group_var_aggrs(i): continue
         # At the end of a table scan, compute all necessary averages for this grouping variable
         table_scan = generate_emf_table_scan(
             i, mf_index_name, row_name, group_var_preds_code[i], group_var_update_aggrs_code[i]
@@ -305,10 +323,21 @@ for row in table:
     # Join all scans
     emf_algorithm = '\n\n\n'.join(emf_algorithm)
 
+    # Having condition
+    having = f"""
+# Having condition
+mf_struct[:] = list(filter(
+    lambda entry: {generate_having_condition(phi, 'entry')}, 
+    mf_struct
+))
+""".strip() if phi.G else ""
+
     return f"""
 {populate_mf_struct}
 
 {emf_algorithm}
+
+{having}
     """.strip()
 
 def generate_program(mf_struct: str, helpers: str, body: str) -> str:
@@ -345,13 +374,11 @@ def query():
 
 {indent(body)}
 
-    return tabulate.tabulate(table,
-                        headers="keys", tablefmt="psql")
+    return output()
 
 def main():
     table = query()
-    output()
-    return table
+    print_output(table)
     
 if "__main__" == __name__:
     main()

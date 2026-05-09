@@ -11,7 +11,7 @@ cust
 count_1_quant, sum_2_quant, max_3_quant
 
 # 5. PRED-LIST – list of predicates for grouping var’s
-1.state = ‘NY’, 2.state = ‘NJ’, 3.state = ‘CT’
+1.state = 'NY', 2.state = 'NJ', 3.state = 'CT'
 
 # 6. HAVING
 NONE

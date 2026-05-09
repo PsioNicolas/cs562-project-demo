@@ -114,30 +114,36 @@ def _read_phi_from_manual_input() -> Phi:
     G = _read_having(input("Having condition: "))
     return Phi(S, n, V, F, sigma, G)
 
-def _read_select_attrs(S: str):
+def _read_select_attrs(S: str) -> list[str]:
     '''Reads a string S of select attributes separated by commas'''
     return _parse_comma_separated_list(S)
 
-def _read_num_group_vars(n: str):
+def _read_num_group_vars(n: str) -> int:
     '''Reads a string n of the number of grouping variables'''
     return int(n)
 
-def _read_group_attrs(V: str):
+def _read_group_attrs(V: str) -> list[str]:
     '''Reads a string V of group by attributes separated by commas'''
     return _parse_comma_separated_list(V)
 
-def _read_aggregates(F: str):
+def _read_aggregates(F: str) -> list[str]:
     '''Reads a string F of aggregates separated by commas'''
     return _parse_comma_separated_list(F)
 
-def _read_group_var_preds(sigma: str):
+def _read_group_var_preds(sigma: str) -> list[str]:
     '''Reads a string sigma of group variable predicates separated by commas'''
     return _parse_comma_separated_list(sigma)
 
-def _read_having(G: str):
+def _read_having(G: str) -> str:
     '''Reads a string G of a having clause predicate'''
-    return G.strip()
+    return _handle_none(G)
 
-def _parse_comma_separated_list(l: str):
+def _parse_comma_separated_list(l: str) -> list[str]:
     '''Returns a list from a string l of comma separated items'''
+    none = _handle_none(l)
+    if not none: return []
     return [attr.strip() for attr in l.split(',')]
+
+def _handle_none(input: str) -> str:
+    '''Returns empty string if user input is NONE, else leaves it the same'''
+    return "" if input.strip().upper() == "NONE" else input.strip()
