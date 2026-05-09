@@ -42,9 +42,9 @@ def test_generator(phi_expr_file):
     phi_query_result = tabulate.tabulate(sort_table(_generated.query()), headers="keys", tablefmt="psql")
     sql_query_result = tabulate.tabulate(sort_table(sql(query)), headers="keys", tablefmt="psql")
 
-    print("\n\n")
+    print("\nSorted result:")
 
-    print(phi_query_result, '\n', sql_query_result)
+    print(phi_query_result, '\nNormal Sorted SQL:\n', sql_query_result)
 
     # Compare the output of your generated code to the output of the actual SQL query
     # Note: This only works for standard queries, not ESQL queries.
