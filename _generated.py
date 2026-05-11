@@ -9,39 +9,26 @@ from dataclasses import dataclass
 
 @dataclass(slots=True)
 class MfStruct:
-    prod: str
-    month: int
-    avg_quant: int
-    sum_quant: int
-    count_quant: int
-    avg_1_quant: int
-    sum_1_quant: int
-    count_1_quant: int
-    avg_2_quant: int
-    sum_2_quant: int
-    count_2_quant: int
+
 
 mf_struct = []
 
 def lookup(cur_row):
     '''Search for all indices in the mf_struct that match the current group'''
     for i in range(len(mf_struct)):
-        if mf_struct[i].prod == cur_row['prod'] and mf_struct[i].month == cur_row['month']:
+        if :
             return i
     return -1
 
 def add(cur_row):
     '''Adds a new entry in mf_struct corresponding to a newly found group by attribute value'''
-    mf_struct.append(MfStruct(prod=cur_row['prod'], month=cur_row['month'], avg_quant=0, sum_quant=0, count_quant=0, avg_1_quant=0, sum_1_quant=0, count_1_quant=0, avg_2_quant=0, sum_2_quant=0, count_2_quant=0))
+    mf_struct.append(MfStruct())
 
 def output():
     '''Returns only the select attributes of mf_struct'''
     mf_struct_table = [{
-        'prod': entry.prod,
-        'month': entry.month,
-        'avg_quant': entry.avg_quant,
-        'avg_1_quant': entry.avg_1_quant,
-        'avg_2_quant': entry.avg_2_quant
+        'cust': entry.cust,
+        'prod': entry.prod
     } for entry in mf_struct]
     return mf_struct_table
 
@@ -68,38 +55,6 @@ def query():
         pos = lookup(row)
         if pos == -1:
             add(row)
-
-    # Table scan for grouping variable 0
-    for cur_row in table:
-        for i in range(len(mf_struct)):
-            if cur_row['prod'] == mf_struct[i].prod and cur_row['month'] == mf_struct[i].month:
-                mf_struct[i].sum_quant += cur_row['quant']
-                mf_struct[i].count_quant += 1
-    # Compute averages for grouping variable 0 at end of scan
-    for i in range(len(mf_struct)):
-        mf_struct[i].avg_quant = mf_struct[i].sum_quant / mf_struct[i].count_quant
-
-
-    # Table scan for grouping variable 1
-    for cur_row in table:
-        for i in range(len(mf_struct)):
-            if cur_row['quant'] > mf_struct[i].avg_quant:
-                mf_struct[i].sum_1_quant += cur_row['quant']
-                mf_struct[i].count_1_quant += 1
-    # Compute averages for grouping variable 1 at end of scan
-    for i in range(len(mf_struct)):
-        mf_struct[i].avg_1_quant = mf_struct[i].sum_1_quant / mf_struct[i].count_1_quant
-
-
-    # Table scan for grouping variable 2
-    for cur_row in table:
-        for i in range(len(mf_struct)):
-            if cur_row['quant'] > mf_struct[i].avg_1_quant:
-                mf_struct[i].sum_2_quant += cur_row['quant']
-                mf_struct[i].count_2_quant += 1
-    # Compute averages for grouping variable 2 at end of scan
-    for i in range(len(mf_struct)):
-        mf_struct[i].avg_2_quant = mf_struct[i].sum_2_quant / mf_struct[i].count_2_quant
 
     return output()
 
